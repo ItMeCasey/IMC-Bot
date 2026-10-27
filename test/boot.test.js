@@ -12,7 +12,7 @@ test('the whole bot starts without a token: every module is wired and the dashbo
   const { main } = require('../src/index');
   const app = await main();
   try {
-    for (const k of ['basic', 'moderation', 'automod', 'bridge', 'golive', 'mirror', 'logging', 'selfroles', 'viewer', 'giveaway', 'tickets', 'regulars', 'announce']) assert.ok(app.late[k], k + ' is created');
+    for (const k of ['basic', 'moderation', 'automod', 'bridge', 'golive', 'mirror', 'logging', 'selfroles', 'viewer', 'giveaway', 'tickets', 'regulars', 'announce', 'suggestions', 'polls', 'xp', 'starboard', 'antinuke', 'verify']) assert.ok(app.late[k], k + ' is created');
     const r = await fetch('http://127.0.0.1:' + app.port + '/api/status'); const j = await r.json();
     assert.equal(j.bot.state, 'offline'); assert.equal(j.settings.hasToken, false); assert.ok(j.settings.automod && j.settings.mirror && j.settings.logging && j.settings.moderation);
     const names = [...app.ctx.discord ? ['ping', 'warn', 'ban', 'rolepanel'] : []];
@@ -31,7 +31,11 @@ test('every slash command is valid for Discord: required options first, names an
     for (const c of list) {
       assert.ok(!names.has(c.name), 'duplicate command ' + c.name); names.add(c.name);
       assert.match(c.name, /^[a-z0-9_-]{1,32}$/); assert.ok(c.description.length >= 1 && c.description.length <= 100, c.name + ' description');
-      const o = c.options || []; assert.ok(o.length <= 25, c.name + ' options');
+      const check = (name, o) => { assert.ok(o.length <= 25, name + ' options'); let optional = false;
+        for (const x of o) { assert.match(x.name, /^[a-z0-9_-]{1,32}$/, name + '.' + x.name); assert.ok(x.description.length >= 1 && x.description.length <= 100, name + '.' + x.name + ' description');
+          if (x.type === 1 || x.type === 2) check(name + ' ' + x.name, x.options || []); else if (!x.required) optional = true; else assert.ok(!optional, name + ': required option "' + x.name + '" comes after an optional one'); } };
+      check(c.name, c.options || []); continue;
+      const o = c.options || [];
       let optional = false; for (const x of o) { assert.match(x.name, /^[a-z0-9_-]{1,32}$/, c.name + '.' + x.name); assert.ok(x.description.length >= 1 && x.description.length <= 100, c.name + '.' + x.name + ' description'); if (!x.required) optional = true; else assert.ok(!optional, c.name + ': required option "' + x.name + '" comes after an optional one'); }
     }
   } finally { await app.quit(); }

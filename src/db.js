@@ -20,6 +20,15 @@ const STEPS = [
    CREATE INDEX tickets_user ON tickets (guild_id, user_id, status);`,
   `CREATE TABLE member_stats (guild_id TEXT NOT NULL, user_id TEXT NOT NULL, joined_at INTEGER NOT NULL, conversations INTEGER NOT NULL DEFAULT 0,
      regular_since INTEGER, manual INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (guild_id, user_id));`,
+  `CREATE TABLE suggestions (id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id TEXT NOT NULL, channel_id TEXT NOT NULL, message_id TEXT, user_id TEXT NOT NULL, text TEXT NOT NULL,
+     status TEXT NOT NULL DEFAULT 'open', note TEXT, created_at INTEGER NOT NULL);
+   CREATE TABLE suggestion_votes (suggestion_id INTEGER NOT NULL, user_id TEXT NOT NULL, vote INTEGER NOT NULL, PRIMARY KEY (suggestion_id, user_id));
+   CREATE TABLE polls (id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id TEXT NOT NULL, channel_id TEXT NOT NULL, message_id TEXT, question TEXT NOT NULL, options TEXT NOT NULL,
+     host TEXT NOT NULL, ends_at INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'open', created_at INTEGER NOT NULL);
+   CREATE TABLE poll_votes (poll_id INTEGER NOT NULL, user_id TEXT NOT NULL, choice INTEGER NOT NULL, PRIMARY KEY (poll_id, user_id));
+   CREATE TABLE xp (guild_id TEXT NOT NULL, user_id TEXT NOT NULL, xp INTEGER NOT NULL DEFAULT 0, level INTEGER NOT NULL DEFAULT 0, last_at INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (guild_id, user_id));
+   CREATE INDEX xp_rank ON xp (guild_id, xp DESC);
+   CREATE TABLE starred (message_id TEXT PRIMARY KEY, guild_id TEXT NOT NULL, board_message_id TEXT, stars INTEGER NOT NULL DEFAULT 0);`,
 ];
 
 module.exports = function openDb(file) {

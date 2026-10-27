@@ -54,3 +54,4 @@ module.exports = function createSelfRoles(ctx) {
   return { onPress, whyNot };
 };
 module.exports.whyNot = whyNot;
+module.exports.POWER = POWER;
