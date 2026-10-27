@@ -113,6 +113,14 @@
   </section>
 
   <section>
+    <h2>Stream announcements</h2>
+    <div class="muted" style="margin-bottom:8px">Posts in #announcements when a raid arrives and when you pass a round number of followers. Needs IMC-Stream running with the bridge. Viewers can also use <code>/schedule</code> to see your next streams.</div>
+    <div class="row"><label class="chk"><input id="an_on" type="checkbox"> <b>Post stream announcements</b></label><label class="chk"><input id="an_raids" type="checkbox"> Raids</label><label class="chk"><input id="an_milestones" type="checkbox"> Follower milestones</label>
+      <label class="fld" style="flex:none;min-width:0;width:170px">Raids of at least (viewers)<input id="an_minRaid" type="number" min="1"></label><label class="fld" style="flex:none;min-width:0;width:170px">A milestone every (followers)<input id="an_milestoneEvery" type="number" min="10"></label></div>
+    <div class="row"><button id="saveAn">Save announcements</button></div>
+  </section>
+
+  <section>
     <h2>IMC-Stream &amp; go-live</h2>
     <div class="muted" id="bridgeline" style="margin-bottom:8px"></div>
     <div class="row"><label class="chk"><input id="goLive" type="checkbox"> Post in #go-live when the stream starts (and edit it when the title or game changes and when the stream ends)</label></div>
@@ -136,7 +144,7 @@ function draw(v) {
   $('botline').innerHTML = b.state === 'online' ? 'Connected as <b class="ok">' + b.bot + '</b>' : b.error ? '<span class="bad">' + b.error + '</span>' : s.hasToken ? 'Token saved.' : 'No token yet.';
   $('inviteline').innerHTML = b.invite ? 'Bot missing permissions, or not in your server yet? <a href="' + b.invite + '" target="_blank" rel="noopener" style="color:var(--aqua)">Open the invite link</a> (adds it with the permissions it needs).' : '';
   const sel = $('guild'); if (document.activeElement !== sel) sel.innerHTML = '<option value="">Choose a server</option>' + v.guilds.map((g) => '<option value="' + g.id + '">' + g.name.replace(/</g, '&lt;') + '</option>').join(''); if (document.activeElement !== sel) sel.value = s.guildId;
-  drawAm(s.automod); drawMi(s.mirror); drawRg(s.regulars); for (const k of LG) $('lg_' + k).checked = s.logging[k];
+  drawAm(s.automod); drawMi(s.mirror); drawRg(s.regulars); drawAn(s.announce); for (const k of LG) $('lg_' + k).checked = s.logging[k];
   const mo = s.moderation, setIf = (id, val) => { if (document.activeElement !== $(id)) $(id).value = val; };
   $('dmUser').checked = mo.dmUser; setIf('decayDays', mo.decayDays); setIf('timeoutAt', mo.ladder.timeoutAt); setIf('timeoutMinutes', mo.ladder.timeoutMinutes); setIf('banAt', mo.ladder.banAt);
   $('welcome').checked = s.welcome.on; $('dryRun').checked = s.dryRun; $('goLive').checked = s.goLive.on;
@@ -185,6 +193,14 @@ const rgBody = () => ({ on: $('rg_on').checked, notice: $('rg_notice').checked, 
   restrict: { links: $('rg_links').checked, attachments: $('rg_attachments').checked, invites: $('rg_invites').checked, mentions: $('rg_mentions').checked, maxMentions: $('rg_maxMentions').value } });
 $('saveRg').onclick = run(async () => { draw(await api('settings', { regulars: rgBody() })); toast('Saved'); });
 $('rg_on').onchange = run(async () => draw(await api('settings', { regulars: { on: $('rg_on').checked } })));
+
+function drawAn(a) {
+  for (const k of ['on', 'raids', 'milestones']) $('an_' + k).checked = a[k];
+  for (const k of ['minRaid', 'milestoneEvery']) if (document.activeElement !== $('an_' + k)) $('an_' + k).value = a[k];
+}
+const anBody = () => ({ on: $('an_on').checked, raids: $('an_raids').checked, milestones: $('an_milestones').checked, minRaid: $('an_minRaid').value, milestoneEvery: $('an_milestoneEvery').value });
+$('saveAn').onclick = run(async () => { draw(await api('settings', { announce: anBody() })); toast('Saved'); });
+$('an_on').onchange = run(async () => draw(await api('settings', { announce: { on: $('an_on').checked } })));
 const load = async () => draw(await api('status'));
 $('saveToken').onclick = run(async () => {
   if ($('token').value.trim()) { draw(await api('settings', { token: $('token').value })); $('token').value = ''; toast('Saved'); }

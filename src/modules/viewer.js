@@ -1,13 +1,13 @@
 'use strict';
 /**
  * The commands every viewer can use, answered from IMC-Stream (the same lists as the viewers' website):
- * /commands (chat commands, without the mod ones), /games, /tts, /top (points), /live and /website.
+ * /commands (chat commands, without the mod ones), /games, /tts, /top (points), /live, /website and /schedule.
  */
 const { SlashCommandBuilder } = require('discord.js');
 const { COLOR, embed } = require('../theme');
 
 const cut = (t, n) => (String(t).length > n ? String(t).slice(0, n - 1) + '…' : String(t));
-const LIST = [['commands', 'The chat commands of the stream'], ['games', 'The games you can play in chat'], ['tts', 'How to get your message read out loud on stream'], ['top', 'The points leaderboard'], ['live', 'Is the stream live right now?'], ['website', 'The stream website']];
+const LIST = [['commands', 'The chat commands of the stream'], ['games', 'The games you can play in chat'], ['tts', 'How to get your message read out loud on stream'], ['top', 'The points leaderboard'], ['live', 'Is the stream live right now?'], ['website', 'The stream website'], ['schedule', 'When the next streams are']];
 
 /** the reply for one command, from IMC-Stream's snapshot (live, title, game, login, website) and info (commands, games, top, tts) */
 function answer(name, snap, info) {
@@ -26,6 +26,11 @@ function answer(name, snap, info) {
   }
   if (name === 'top') { const top = info.top || []; return { embeds: [embed('Points leaderboard', top.length ? top.map((p, i) => (i + 1) + '. **' + p.name + '** ' + p.pts).join('\n') : 'Nobody has points yet.', COLOR.cream)] }; }
   if (name === 'live') return { embeds: [embed(snap.live ? 'The stream is live!' : 'The stream is offline', snap.live ? (snap.title || '') + (snap.game ? '\n**Playing:** ' + snap.game : '') + (twitch ? '\n' + twitch : '') : (twitch ? 'Follow to get notified: ' + twitch : 'Not live right now.'), snap.live ? COLOR.rust : COLOR.cream)] };
+  if (name === 'schedule') {
+    const list = (info.segments || []).filter((x) => x.start).slice(0, 7);
+    const rows = list.map((x) => { const t = Math.floor(Date.parse(x.start) / 1000), line = '<t:' + t + ':F> (<t:' + t + ':R>)' + (x.title ? ' **' + x.title + '**' : '') + (x.category ? ' (' + x.category + ')' : ''); return x.canceled ? '~~' + line + '~~ canceled' : line; });
+    return { embeds: [embed('Stream schedule', rows.join('\n') || 'No streams are scheduled right now.' + (twitch ? '\n' + twitch : ''), COLOR.aqua)] };
+  }
   if (name === 'website') return { content: site || 'The website is not published yet.' };
   return { content: 'I do not know that command.' };
 }
@@ -35,7 +40,7 @@ module.exports = function createViewer(ctx) {
     ctx.discord.register({ data: new SlashCommandBuilder().setName(name).setDescription(desc).setDMPermission(false), run: async (i) => {
       await i.deferReply();
       let snap, info;
-      try { [snap, info] = await Promise.all([ctx.bridge.snapshot(), name === 'live' || name === 'website' ? {} : ctx.bridge.info()]); } catch (e) {
+      try { [snap, info] = await Promise.all([ctx.bridge.snapshot(), name === 'live' || name === 'website' ? {} : name === 'schedule' ? ctx.bridge.schedule() : ctx.bridge.info()]); } catch (e) {
         return i.editReply({ content: 'I cannot reach the stream app right now. Try again in a moment.' });
       }
       return i.editReply(Object.assign(answer(name, snap, info), { allowedMentions: { parse: [] } }));
