@@ -80,3 +80,28 @@ test('dashboard answers only this PC and never returns the token', async () => {
     assert.equal((await req('POST', '/api/nope', {})).code, 404);
   } finally { await web.close(); }
 });
+
+test('the bridge address must be an http(s) address and is cut to its origin; the password is a secret like the token', () => {
+  const dir = tmp(), c = createConfig(dir);
+  let v = c.set({ bridge: { url: ' http://192.168.1.5:8420/some/path ' }, bridgePassword: 'hunter22' });
+  assert.equal(v.bridge.url, 'http://192.168.1.5:8420'); assert.equal(v.hasBridgePassword, true); assert.ok(!JSON.stringify(v).includes('hunter22'));
+  assert.ok(!fs.readFileSync(path.join(dir, 'config.json'), 'utf8').includes('hunter22')); assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'secrets.json'), 'utf8')).bridgePassword, 'hunter22');
+  for (const bad of ['javascript:alert(1)', 'not an address', 'ftp://x/y']) assert.equal(c.set({ bridge: { url: bad } }).bridge.url, 'http://192.168.1.5:8420', bad);
+  assert.equal(c.set({ clearBridgePassword: true }).hasBridgePassword, false);
+});
+
+test('the dashboard test button sends a pretend boost to IMC-Stream and says whether it was shown', async () => {
+  const dir = tmp(), config = createConfig(dir), sent = []; let shown = true;
+  const discord = { status: () => ({ state: 'offline', bot: '', error: '' }), guilds: () => [], start: async () => {}, stop: async () => {}, registerCommands: async () => {}, guild: async () => ({}) };
+  const web = createWeb({ config, discord, setup: {}, bridge: { status: () => ({ state: 'connected' }), alert: async (e, v) => { sent.push([e, v]); return { ok: true, shown }; } }, publicDir: path.join(__dirname, '..', 'public'), log() {} });
+  const port = await web.listen(0), post = (p) => fetch('http://127.0.0.1:' + port + '/api/' + p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).then((r) => r.json());
+  try {
+    assert.deepEqual(await post('test-stream-alert'), { ok: true, shown: true }); assert.deepEqual(sent, [['discord_boost', { name: 'TestBooster', boosts: 1, level: 1 }]]);
+    shown = false; assert.deepEqual(await post('test-stream-alert'), { ok: true, shown: false }, 'IMC-Stream had no rule for it');
+  } finally { await web.close(); }
+});
+
+test('the Discord alert settings are clamped like the others', () => {
+  const c = createConfig(tmp()), v = c.set({ streamAlerts: { on: true, joins: true, milestoneEvery: 1, evil: 1 } });
+  assert.deepEqual(v.streamAlerts, { on: true, boosts: true, joins: true, milestones: true, milestoneEvery: 10 });
+});

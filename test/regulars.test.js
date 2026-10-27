@@ -89,3 +89,10 @@ test('/progress shows how far along you are; /regular lets mods look, grant and 
   r.cfg.regulars.on = false; assert.match((await run('progress', null, a)).content, /not switched on/);
   const j = r.cmds.get('regular').data.toJSON(); assert.equal(j.default_member_permissions, F.ModerateMembers.toString()); assert.equal(r.cmds.get('progress').data.toJSON().default_member_permissions, undefined, 'everyone can see their own progress');
 });
+
+test('new members may post links and images in an exempt channel, but still not elsewhere', async () => {
+  const r = rig({ exemptChannels: ['MEMES'] }), n = r.mk('NEW', { joined: T0 - 2 * DAY });
+  const free = r.msg(n, 'https://example.com', { ch: 'MEMES' }); await r.reg.onMessage(free); assert.equal(free.deleted, 0);
+  const other = r.msg(n, 'https://example.com', { ch: 'C1' }); await r.reg.onMessage(other); assert.equal(other.deleted, 1);
+  const stat = r.db.prepare('SELECT conversations FROM member_stats WHERE user_id = ?').get('NEW'); assert.ok(stat, 'chat there is still counted toward becoming a Regular');
+});

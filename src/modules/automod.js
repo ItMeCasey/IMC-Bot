@@ -59,7 +59,7 @@ module.exports = function createAutomod(ctx) {
 
   async function onMessage(m) {
     if (!m.guild || !m.author || m.author.bot || m.webhookId || m.system) return;
-    const a = A(); if (!a.on || exempt(m.member)) return;
+    const a = A(); if (!a.on || exempt(m.member) || (a.exemptChannels || []).includes(m.channelId)) return;
     const mc = m.mentions ? (m.mentions.users ? m.mentions.users.size : 0) + (m.mentions.roles ? m.mentions.roles.size : 0) + (m.mentions.everyone ? 1 : 0) : 0;
     const v = evaluate({ userId: m.author.id, content: m.content, mentionCount: mc }, a); if (!v) return;
     const snippet = cut(m.content || '', 200), where = '<@' + m.author.id + '> in <#' + m.channelId + '>';

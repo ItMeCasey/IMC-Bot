@@ -21,6 +21,7 @@ const safeName = (n) => (String(n || 'viewer').replace(/discord/gi, 'D1scord').r
 module.exports = function createMirror(ctx) {
   const log = ctx.log || (() => {}), cfg = () => ctx.config.get(), M = () => cfg().mirror;
   let queue = [], skipped = 0, timer = null;
+  const pics = new Map();   // twitch user id -> { at, url } (a missing picture is remembered for a few minutes so it is not asked for again and again)
   const sent = new Map();   // twitch message id -> { uid, discordId, channelId }, the last few, so a delete can follow
 
   const link = /\bhttps?:\/\/\S+|\bwww\.\S+/gi;
@@ -56,15 +57,28 @@ module.exports = function createMirror(ctx) {
     for (const [id, e] of [...sent]) if (match({ id, uid: e.uid })) { sent.delete(id); ctx.getWebhook(e.channelId).then((w) => w && w.deleteMessage(e.discordId)).catch((err) => log('mirror delete failed:', err.message)); }
   }
 
+  /** profile pictures for the people in this batch: { userId: url }. Asked from IMC-Stream in one request; a failure just means no pictures */
+  async function avatarsFor(batch) {
+    if (!M().avatars || !ctx.avatars) return {};
+    const t = Date.now(), need = [...new Set(batch.map((r) => r.uid).filter((u) => u && !(pics.get(u) && t - pics.get(u).at < (pics.get(u).url ? 6 * 3600000 : 300000))))];
+    if (need.length) {
+      let got = {}; try { got = (await ctx.avatars(need)) || {}; } catch (e) { log('mirror avatars failed:', e.message); }
+      for (const u of need) pics.set(u, { at: t, url: /^https:\/\//.test(got[u] || '') ? got[u] : '' });
+      if (pics.size > 2000) for (const k of [...pics.keys()].slice(0, 500)) pics.delete(k);
+    }
+    const out = {}; for (const r of batch) if (pics.get(r.uid) && pics.get(r.uid).url) out[r.uid] = pics.get(r.uid).url;
+    return out;
+  }
+
   /** send the next few lines (called every second) */
   async function flush() {
     const chId = cfg().channels.mirror; if (!M().on || !chId || (!queue.length && !skipped)) return 0;
     const hook = await ctx.getWebhook(chId); if (!hook) return 0;
     if (skipped) { const n = skipped; skipped = 0; await hook.send({ username: 'IMC-Bot', content: '*' + n + ' messages skipped (chat is moving fast)*', allowedMentions: { parse: [] } }).catch(() => {}); }
-    const batch = queue.splice(0, PER_FLUSH);
+    const batch = queue.splice(0, PER_FLUSH), pic = await avatarsFor(batch);
     for (const r of batch) {
       try {
-        const msg = await hook.send({ username: r.username, content: r.content, allowedMentions: { parse: [] } });
+        const msg = await hook.send({ username: r.username, avatarURL: pic[r.uid] || undefined, content: r.content, allowedMentions: { parse: [] } });
         if (r.id && msg) { sent.set(r.id, { uid: r.uid, discordId: msg.id, channelId: chId }); if (sent.size > REMEMBER) sent.delete(sent.keys().next().value); }
       } catch (e) { log('mirror send failed:', e.message); if (ctx.forgetWebhook) ctx.forgetWebhook(chId); }
     }

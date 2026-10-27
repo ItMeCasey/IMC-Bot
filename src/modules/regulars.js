@@ -6,7 +6,7 @@
  *    After a quiet gap (default 30 minutes) the next exchange is a new conversation. So 10 conversations means 10 separate chats,
  *    not 10 messages in one afternoon.
  *  - The days count from when the person joined the server (Discord knows this even for people who joined before the bot arrived).
- *  - Mods, people with an exempt role (for example your sub roles) and anyone with the Regular role are never limited.
+ *  - Mods, people with an exempt role (for example your sub roles), anyone with the Regular role, and chat in exempt channels are never limited.
  *  - A mod can promote or demote by hand (/regular). Everything here is off until switched on, and follows "Dry run".
  */
 const { SlashCommandBuilder, PermissionFlagsBits: F, MessageFlags, Events } = require('discord.js');
@@ -100,7 +100,7 @@ module.exports = function createRegulars(ctx) {
     const guild = m.guild, member = m.member; if (!member) return;
     track(guild.id, m.channelId, m.author.id, member.joinedTimestamp);
     const role = await roleOf(guild, false);
-    if (!exempt(member, role)) {
+    if (!exempt(member, role) && !(R().exemptChannels || []).includes(m.channelId)) {
       const mc = m.mentions ? (m.mentions.users ? m.mentions.users.size : 0) + (m.mentions.roles ? m.mentions.roles.size : 0) + (m.mentions.everyone ? 1 : 0) : 0, what = broken(m, mc);
       if (what) {
         if (cfg().dryRun) await logLine('Dry run: would remove a message from a new member (' + what + ')', '<@' + m.author.id + '> in <#' + m.channelId + '>\n> ' + cut(m.content || '(attachment)', 200));

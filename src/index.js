@@ -20,6 +20,7 @@ const createGiveaway = require('./modules/giveaway');
 const createTickets = require('./modules/tickets');
 const createRegulars = require('./modules/regulars');
 const createAnnounce = require('./modules/announce');
+const createStreamAlerts = require('./modules/streamalerts');
 const createSuggestions = require('./modules/suggestions');
 const createPolls = require('./modules/polls');
 const createXp = require('./modules/xp');
@@ -35,7 +36,7 @@ async function main() {
   const ctx = { config, db, log };
   ctx.kv = createKv(db);
   const late = {};   // modules that need the Discord connection, which is made just below
-  ctx.onReady = (client) => { late.basic.attach(client); late.automod.attach(client); late.xp.attach(client); late.starboard.attach(client); late.antinuke.attach(client); late.regulars.attach(client); late.regulars.start(); late.logging.attach(client); late.mirror.start(); late.giveaway.start(); late.polls.start(); late.bridge.start(); late.golive.catchUp().catch((e) => log('go-live catch-up:', e.message)); };   // the bridge starts once Discord is online, so no event is handled before it can be posted
+  ctx.onReady = (client) => { late.basic.attach(client); late.automod.attach(client); late.streamAlerts.attach(client); late.xp.attach(client); late.starboard.attach(client); late.antinuke.attach(client); late.regulars.attach(client); late.regulars.start(); late.logging.attach(client); late.mirror.start(); late.giveaway.start(); late.polls.start(); late.bridge.start(); late.golive.catchUp().catch((e) => log('go-live catch-up:', e.message)); };   // the bridge starts once Discord is online, so no event is handled before it can be posted
   ctx.discord = createDiscord(ctx);
   ctx.botId = () => { const c = ctx.discord.client(); return c && c.user ? c.user.id : ''; };
   const hooks = new Map();   // channel id -> the mirror's webhook
@@ -49,6 +50,7 @@ async function main() {
   };
   ctx.fetchGuild = async (id) => { const c = ctx.discord.client(); return c ? c.guilds.fetch(id).catch(() => null) : null; };
   ctx.guilds = () => { const c = ctx.discord.client(); return c ? [...c.guilds.cache.values()] : []; };
+  ctx.avatars = (ids) => late.bridge.avatars(ids);
   ctx.wantChat = () => !!config.get().mirror.on;
   ctx.fetchChannel = async (id) => { const c = ctx.discord.client(); return c ? c.channels.fetch(id).catch(() => null) : null; };
   late.basic = createBasic(ctx);
@@ -62,6 +64,7 @@ async function main() {
   late.tickets = createTickets(ctx);
   late.regulars = createRegulars(ctx);
   late.announce = createAnnounce(ctx);
+  late.streamAlerts = createStreamAlerts(ctx);
   late.suggestions = createSuggestions(ctx);
   late.polls = createPolls(ctx);
   late.xp = createXp(ctx);

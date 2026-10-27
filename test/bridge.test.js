@@ -35,7 +35,8 @@ test('first start skips old events; later ones arrive once, in order', async () 
 
 test('bridge reports a stopped IMC-Stream, an old version, and recovers', async () => {
   const s = fakeStream(), b = createLocalBridge({ config: cfg(), kv: memKv(), fetch: s.fetch, log() {} });
-  s.down = true; await b.poll(); assert.deepEqual([b.status().state, b.status().error], ['offline', 'IMC-Stream is not running']);
+  s.down = true; await b.poll(); assert.deepEqual([b.status().state, b.status().error], ['offline', 'IMC-Stream is not reachable at that address']);
+  const here = createLocalBridge({ config: cfg({ bridge: { url: 'http://127.0.0.1:8420' } }), kv: memKv(), fetch: s.fetch, log() {} }); await here.poll(); assert.equal(here.status().error, 'IMC-Stream is not running', 'on the same PC the plain wording is used');
   s.down = false; s.status = 404; await b.poll(); assert.match(b.status().error, /update IMC-Stream/);
   s.status = 200; await b.poll(); assert.equal(b.status().state, 'connected');
 });
@@ -103,4 +104,33 @@ test('recaps go to #announcements without pinging anyone', async () => {
   assert.equal(r.posts[0][0], 'A'); assert.deepEqual(r.posts[0][1].allowedMentions, { parse: [] }); assert.equal(r.posts[0][1].embeds[0].title, 'Stream recap');
   await r.g.onEvent({ type: 'recap', data: { text: '' } }); assert.equal(r.posts.length, 1, 'empty recaps are ignored');
   const none = rig({ channels: {} }); await none.g.onEvent({ type: 'recap', data: { text: 'x' } }); assert.equal(none.posts.length, 0);
+});
+
+/** a pretend IMC-Stream that wants the remote-access login */
+function lockedStream(password) {
+  const s = { sessions: new Set(), logins: 0, calls: [] };
+  s.fetch = async (u, o) => {
+    o = o || {}; const url = new URL(u); s.calls.push(url.pathname + url.search);
+    if (url.pathname === '/api/login') { const ok = JSON.parse(o.body).password === password; if (!ok) return { ok: false, status: 401, headers: new Map(), json: async () => ({}) };
+      s.logins++; const id = 's'.repeat(0) + (s.logins + '').padStart(64, 'a'); s.sessions.add(id); return { ok: true, status: 200, headers: { getSetCookie: () => ['icm_session=' + id + '; HttpOnly; Path=/'] }, json: async () => ({ ok: true }) }; }
+    const c = /icm_session=([a-f0-9]+)/.exec((o.headers || {}).Cookie || '');
+    if (!c || !s.sessions.has(c[1])) return { ok: false, status: s.refuse ? 403 : 401, headers: new Map(), json: async () => ({ error: 'Not logged in' }) };
+    return { ok: true, status: 200, headers: new Map(), json: async () => (url.pathname === '/api/bridge/avatars' ? { 7: 'https://cdn/7.png' } : { boot: 'b', cursor: 0, events: [] }) };
+  };
+  return s;
+}
+const remoteCfg = (pw) => ({ get: () => ({ bridge: { url: 'http://192.168.1.9:8420/' } }), secret: (k) => (k === 'bridgePassword' ? pw.v : '') });
+
+test('another computer: the bot logs in with the remote-access password once, keeps the session and logs in again when it ends', async () => {
+  const s = lockedStream('hunter22'), pw = { v: 'hunter22' }, b = createLocalBridge({ config: remoteCfg(pw), kv: memKv(), fetch: s.fetch, log() {} });
+  await b.poll(); await b.poll(); await b.snapshot(); assert.equal(s.logins, 1, 'one login serves every request'); assert.equal(b.status().state, 'connected');
+  s.sessions.clear(); await b.poll(); assert.equal(s.logins, 2, 'the session ended on the other side: logged in again without an error'); assert.equal(b.status().state, 'connected');
+  assert.deepEqual(await b.avatars(['7', '8 9']), { 7: 'https://cdn/7.png' }); assert.ok(s.calls.includes('/api/bridge/avatars?ids=7,8%209'), 'ids are encoded');
+  pw.v = 'other'; await b.poll(); assert.equal(b.status().state, 'offline'); assert.match(b.status().error, /did not accept that password/, 'a changed password is used at once, and a wrong one is reported');
+});
+
+test('without the password the bot says what to do, in plain words', async () => {
+  const s = lockedStream('hunter22'), b = createLocalBridge({ config: remoteCfg({ v: '' }), kv: memKv(), fetch: s.fetch, log() {} });
+  await b.poll(); assert.match(b.status().error, /asks for its remote-access password: enter it in the dashboard/);
+  s.refuse = true; await b.poll(); assert.match(b.status().error, /switch on remote access in its Setup page/);
 });
