@@ -1,6 +1,6 @@
 # IMC-Bot status (written overnight, 2026-10-26)
 
-Nothing is committed or pushed, in either project. Run the tests with `npm test` (63 pass).
+Nothing is committed or pushed, in either project. Run the tests with `npm test` (70 pass).
 
 ## What exists now
 | Area | What it does | Default |
@@ -15,6 +15,7 @@ Nothing is committed or pushed, in either project. Run the tests with `npm test`
 | Viewer commands | `/commands /games /tts /top /live /website`, answered from IMC-Stream (they were lost when the built-in bot was removed, now back) | on, needs the bridge |
 | Giveaways | `/giveaway start prize duration [winners] [role]`, `end`, `cancel`, `reroll`, `list`; Enter button; random draw; survives restarts | on (mods with Manage Messages) |
 | Tickets | `/ticketpanel` posts an "Open a ticket" button; private channel for the person + Mods; Close saves a transcript to `#mod-log`. Good for ban appeals | on (needs Manage Channels) |
+| Regulars | New members can't post links/images/invites/mention floods until N days in the server + N separate conversations, then get the `Regular` role. `/progress` (everyone), `/regular status/grant/revoke` (mods) | **off** |
 | Go-live + recap | One message per stream, edited as it changes and ends; recaps to `#announcements` | on, needs the bridge |
 
 Dry run (dashboard, Switches) is still **on**: AutoMod and the warn ladder only report in `#mod-log`, they change nothing.

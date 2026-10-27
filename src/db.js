@@ -18,6 +18,8 @@ const STEPS = [
   `CREATE TABLE tickets (id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id TEXT NOT NULL, channel_id TEXT NOT NULL, user_id TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open',
      created_at INTEGER NOT NULL, closed_at INTEGER, closed_by TEXT);
    CREATE INDEX tickets_user ON tickets (guild_id, user_id, status);`,
+  `CREATE TABLE member_stats (guild_id TEXT NOT NULL, user_id TEXT NOT NULL, joined_at INTEGER NOT NULL, conversations INTEGER NOT NULL DEFAULT 0,
+     regular_since INTEGER, manual INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (guild_id, user_id));`,
 ];
 
 module.exports = function openDb(file) {

@@ -12,7 +12,7 @@ test('the whole bot starts without a token: every module is wired and the dashbo
   const { main } = require('../src/index');
   const app = await main();
   try {
-    for (const k of ['basic', 'moderation', 'automod', 'bridge', 'golive', 'mirror', 'logging', 'selfroles', 'viewer', 'giveaway', 'tickets']) assert.ok(app.late[k], k + ' is created');
+    for (const k of ['basic', 'moderation', 'automod', 'bridge', 'golive', 'mirror', 'logging', 'selfroles', 'viewer', 'giveaway', 'tickets', 'regulars']) assert.ok(app.late[k], k + ' is created');
     const r = await fetch('http://127.0.0.1:' + app.port + '/api/status'); const j = await r.json();
     assert.equal(j.bot.state, 'offline'); assert.equal(j.settings.hasToken, false); assert.ok(j.settings.automod && j.settings.mirror && j.settings.logging && j.settings.moderation);
     const names = [...app.ctx.discord ? ['ping', 'warn', 'ban', 'rolepanel'] : []];

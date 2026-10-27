@@ -45,7 +45,7 @@ test('database creates its tables and reopens without migrating twice', () => {
   let db = openDb(file); db.prepare("INSERT INTO cases (guild_id, type, created_at) VALUES ('g', 'warn', 1)").run(); db.close();
   db = openDb(file);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM cases').get().n, 1);
-  assert.equal(db.prepare('PRAGMA user_version').get().user_version, 3);
+  assert.equal(db.prepare('PRAGMA user_version').get().user_version, 4);
   db.close();
 });
 
