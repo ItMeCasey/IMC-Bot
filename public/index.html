@@ -76,7 +76,8 @@
     <div class="row"><label class="chk"><input id="am_on" type="checkbox"> <b>Switch AutoMod on</b></label><label class="chk"><input id="am_warn" type="checkbox"> Give a warning for each removed message</label></div>
     <div id="amRules"></div>
     <div class="row"><label class="fld">Banned words (one per line, whole words only)<textarea id="am_words" rows="4" style="font:inherit;font-size:15px;padding:8px 10px;background:var(--iron);color:var(--cream);border:2px solid #46504f;width:100%"></textarea></label>
-      <label class="fld">Allowed link sites (one per line)<textarea id="am_allow" rows="4" style="font:inherit;font-size:15px;padding:8px 10px;background:var(--iron);color:var(--cream);border:2px solid #46504f;width:100%"></textarea></label></div>
+      <label class="fld">Allowed link sites (one per line)<textarea id="am_allow" rows="4" style="font:inherit;font-size:15px;padding:8px 10px;background:var(--iron);color:var(--cream);border:2px solid #46504f;width:100%"></textarea></label>
+      <label class="fld">Channels AutoMod ignores (channel IDs, one per line)<textarea id="am_exemptChannels" rows="4" style="font:inherit;font-size:15px;padding:8px 10px;background:var(--iron);color:var(--cream);border:2px solid #46504f;width:100%"></textarea></label></div>
     <div class="row"><button id="saveAm">Save AutoMod</button></div>
   </section>
 
@@ -92,13 +93,14 @@
     <div class="row"><b style="letter-spacing:2px;font-size:12px;color:#9aa39f">LIMITED UNTIL REGULAR:</b><label class="chk"><input id="rg_links" type="checkbox"> Links</label><label class="chk"><input id="rg_attachments" type="checkbox"> Images and files</label><label class="chk"><input id="rg_invites" type="checkbox"> Discord invites</label><label class="chk"><input id="rg_mentions" type="checkbox"> Many mentions</label>
       <label class="fld" style="flex:none;min-width:0;width:140px">More than (mentions)<input id="rg_maxMentions" type="number" min="0" max="20"></label></div>
     <div class="row"><label class="fld">Roles that are never limited (role IDs, one per line, for example your sub roles)<textarea id="rg_exempt" rows="3" style="font:inherit;font-size:15px;padding:8px 10px;background:var(--iron);color:var(--cream);border:2px solid #46504f;width:100%"></textarea></label></div>
+    <div class="row"><label class="fld">Channels where newcomers may post anything (channel IDs, one per line, for example a memes channel)<textarea id="rg_exemptChannels" rows="3" style="font:inherit;font-size:15px;padding:8px 10px;background:var(--iron);color:var(--cream);border:2px solid #46504f;width:100%"></textarea></label></div>
     <div class="row"><button id="saveRg">Save Regulars</button></div>
   </section>
 
   <section>
     <h2>Twitch chat mirror</h2>
     <div class="muted" style="margin-bottom:8px">Shows your Twitch chat in #twitch-chat, under each chatter's name. Needs IMC-Stream running with the bridge. Nothing in a chat message can ping anyone on Discord. When Twitch deletes a message, times someone out or clears chat, the Discord lines go too.</div>
-    <div class="row"><label class="chk"><input id="mi_on" type="checkbox"> <b>Mirror Twitch chat</b></label><label class="chk"><input id="mi_hideCommands" type="checkbox"> Hide chat commands (lines starting with !)</label><label class="chk"><input id="mi_showBadges" type="checkbox"> Show mod / VIP / sub icons</label><label class="chk"><input id="mi_stripLinks" type="checkbox"> Replace links with [link]</label></div>
+    <div class="row"><label class="chk"><input id="mi_on" type="checkbox"> <b>Mirror Twitch chat</b></label><label class="chk"><input id="mi_hideCommands" type="checkbox"> Hide chat commands (lines starting with !)</label><label class="chk"><input id="mi_showBadges" type="checkbox"> Show mod / VIP / sub icons</label><label class="chk"><input id="mi_avatars" type="checkbox"> Show Twitch profile pictures</label><label class="chk"><input id="mi_stripLinks" type="checkbox"> Replace links with [link]</label></div>
     <div class="row"><label class="fld">Who is shown<select id="mi_minRole"><option value="all">Everyone</option><option value="subs">Subs, VIPs and mods</option><option value="vip">VIPs and mods</option></select></label></div>
     <div class="row"><label class="fld">Bots to leave out (Twitch names, one per line)<textarea id="mi_hideBots" rows="4" style="font:inherit;font-size:15px;padding:8px 10px;background:var(--iron);color:var(--cream);border:2px solid #46504f;width:100%"></textarea></label>
       <label class="fld">People to leave out (Twitch names, one per line)<textarea id="mi_ignore" rows="4" style="font:inherit;font-size:15px;padding:8px 10px;background:var(--iron);color:var(--cream);border:2px solid #46504f;width:100%"></textarea></label></div>
@@ -131,13 +133,24 @@
     <div class="row"><button id="saveCm">Save community settings</button></div>
   </section>
 
+  <section class="h">
+    <h2>Discord alerts on stream</h2>
+    <div class="muted" style="margin-bottom:8px">Shows Discord events as alerts on your stream, like a follow or a sub: a server boost, a new member, or a round member count. The look, sound and on/off of each alert are set in IMC-Stream (Alerts, and the Alert Builder), under "Discord server boost", "Discord member joined" and "Discord member milestone". Needs IMC-Stream running with the bridge.</div>
+    <div class="row"><label class="chk"><input id="sa_on" type="checkbox"> <b>Show Discord events on stream</b></label><label class="chk"><input id="sa_boosts" type="checkbox"> Server boosts</label><label class="chk"><input id="sa_joins" type="checkbox"> New members</label><label class="chk"><input id="sa_milestones" type="checkbox"> Member milestones</label>
+      <label class="fld" style="flex:none;min-width:0;width:200px">A milestone every (members)<input id="sa_milestoneEvery" type="number" min="10"></label></div>
+    <div class="row"><button id="saveSa">Save</button><button class="ghost" id="testSa">Send a test boost alert</button></div>
+  </section>
+
   <section>
     <h2>IMC-Stream &amp; go-live</h2>
     <div class="muted" id="bridgeline" style="margin-bottom:8px"></div>
     <div class="row"><label class="chk"><input id="goLive" type="checkbox"> Post in #go-live when the stream starts (and edit it when the title or game changes and when the stream ends)</label></div>
     <div class="row"><label class="fld">Ping<select id="ping"><option value="">Nobody</option><option value="here">@here</option><option value="everyone">@everyone</option></select></label>
       <label class="fld">or a role ID<input id="pingRole" maxlength="25" placeholder="e.g. 123456789012345678"></label></div>
-    <div class="muted">Recaps made by IMC-Stream (Recap page) are posted in #announcements. Needs IMC-Stream running on this PC with the bridge (a version newer than 2026.10.17).</div>
+        <div class="row"><label class="fld">IMC-Stream address<input id="br_url" placeholder="http://127.0.0.1:8420"></label><label class="fld">Remote-access password (only if IMC-Stream is on another computer)<input id="br_password" type="password" autocomplete="off" placeholder="leave empty to keep the saved one"></label></div>
+    <div class="row"><button id="saveBr">Save connection</button><button class="ghost" id="clearBr">Remove saved password</button></div>
+    <div class="muted" id="brline" style="margin-bottom:8px"></div>
+<div class="muted">Recaps made by IMC-Stream (Recap page) are posted in #announcements. Needs IMC-Stream running on this PC with the bridge (a version newer than 2026.10.17).</div>
   </section>
 </main>
 <div id="toast"></div>
@@ -155,7 +168,8 @@ function draw(v) {
   $('botline').innerHTML = b.state === 'online' ? 'Connected as <b class="ok">' + b.bot + '</b>' : b.error ? '<span class="bad">' + b.error + '</span>' : s.hasToken ? 'Token saved.' : 'No token yet.';
   $('inviteline').innerHTML = b.invite ? 'Bot missing permissions, or not in your server yet? <a href="' + b.invite + '" target="_blank" rel="noopener" style="color:var(--aqua)">Open the invite link</a> (adds it with the permissions it needs).' : '';
   const sel = $('guild'); if (document.activeElement !== sel) sel.innerHTML = '<option value="">Choose a server</option>' + v.guilds.map((g) => '<option value="' + g.id + '">' + g.name.replace(/</g, '&lt;') + '</option>').join(''); if (document.activeElement !== sel) sel.value = s.guildId;
-  drawAm(s.automod); drawMi(s.mirror); drawRg(s.regulars); drawAn(s.announce); drawCm(s.xp, s.starboard, s.antinuke); for (const k of LG) $('lg_' + k).checked = s.logging[k];
+  if (document.activeElement !== $('br_url')) $('br_url').value = s.bridge.url; $('brline').textContent = s.hasBridgePassword ? 'A password is saved on this PC.' : 'No password saved (not needed when IMC-Stream runs on this PC).';
+  drawAm(s.automod); drawMi(s.mirror); drawRg(s.regulars); drawAn(s.announce); drawSa(s.streamAlerts); drawCm(s.xp, s.starboard, s.antinuke); for (const k of LG) $('lg_' + k).checked = s.logging[k];
   const mo = s.moderation, setIf = (id, val) => { if (document.activeElement !== $(id)) $(id).value = val; };
   $('dmUser').checked = mo.dmUser; setIf('decayDays', mo.decayDays); setIf('timeoutAt', mo.ladder.timeoutAt); setIf('timeoutMinutes', mo.ladder.timeoutMinutes); setIf('banAt', mo.ladder.banAt);
   $('welcome').checked = s.welcome.on; $('dryRun').checked = s.dryRun; $('goLive').checked = s.goLive.on;
@@ -172,9 +186,9 @@ function drawAm(a) {
   const keep = (id) => document.activeElement === $(id);
   $('am_on').checked = a.on; $('am_warn').checked = a.warn;
   for (const [r, , f] of AM) { $('am_' + r + '_on').checked = a[r].on; for (const [k] of f) if (!keep('am_' + r + '_' + k)) $('am_' + r + '_' + k).value = a[r][k]; }
-  if (!keep('am_words')) $('am_words').value = a.words.list.join('\n'); if (!keep('am_allow')) $('am_allow').value = a.links.allow.join('\n');
+  if (!keep('am_words')) $('am_words').value = a.words.list.join('\n'); if (!keep('am_allow')) $('am_allow').value = a.links.allow.join('\n'); if (!keep('am_exemptChannels')) $('am_exemptChannels').value = (a.exemptChannels || []).join(NL);
 }
-const amBody = () => { const a = { on: $('am_on').checked, warn: $('am_warn').checked, words: { on: $('am_words_on').checked, list: $('am_words').value }, links: { on: $('am_links_on').checked, allow: $('am_allow').value } };
+const amBody = () => { const a = { on: $('am_on').checked, warn: $('am_warn').checked, words: { on: $('am_words_on').checked, list: $('am_words').value }, links: { on: $('am_links_on').checked, allow: $('am_allow').value }, exemptChannels: $('am_exemptChannels').value };
   for (const [r, , f] of AM) { a[r] = Object.assign(a[r] || {}, { on: $('am_' + r + '_on').checked }); for (const [k] of f) a[r][k] = $('am_' + r + '_' + k).value; } return a; };
 $('saveAm').onclick = run(async () => { draw(await api('settings', { automod: amBody() })); toast('Saved'); });
 $('am_on').onchange = $('am_warn').onchange = run(async () => draw(await api('settings', { automod: { on: $('am_on').checked, warn: $('am_warn').checked } })));
@@ -182,11 +196,11 @@ $('am_on').onchange = $('am_warn').onchange = run(async () => draw(await api('se
 const NL = String.fromCharCode(10);
 function drawMi(m) {
   const keep = (id) => document.activeElement === $(id);
-  for (const k of ['on', 'hideCommands', 'showBadges', 'stripLinks']) $('mi_' + k).checked = m[k];
+  for (const k of ['on', 'hideCommands', 'showBadges', 'stripLinks', 'avatars']) $('mi_' + k).checked = m[k];
   if (!keep('mi_minRole')) $('mi_minRole').value = m.minRole;
   if (!keep('mi_hideBots')) $('mi_hideBots').value = m.hideBots.join(NL); if (!keep('mi_ignore')) $('mi_ignore').value = m.ignore.join(NL);
 }
-const miBody = () => ({ on: $('mi_on').checked, hideCommands: $('mi_hideCommands').checked, showBadges: $('mi_showBadges').checked, stripLinks: $('mi_stripLinks').checked, minRole: $('mi_minRole').value, hideBots: $('mi_hideBots').value, ignore: $('mi_ignore').value });
+const miBody = () => ({ on: $('mi_on').checked, hideCommands: $('mi_hideCommands').checked, showBadges: $('mi_showBadges').checked, avatars: $('mi_avatars').checked, stripLinks: $('mi_stripLinks').checked, minRole: $('mi_minRole').value, hideBots: $('mi_hideBots').value, ignore: $('mi_ignore').value });
 $('saveMi').onclick = run(async () => { draw(await api('settings', { mirror: miBody() })); toast('Saved'); });
 $('mi_on').onchange = run(async () => draw(await api('settings', { mirror: { on: $('mi_on').checked } })));
 
@@ -198,9 +212,9 @@ function drawRg(r) {
   $('rg_on').checked = r.on; $('rg_notice').checked = r.notice;
   for (const k of ['links', 'attachments', 'invites', 'mentions']) $('rg_' + k).checked = r.restrict[k];
   for (const [id, v] of [['rg_minDays', r.minDays], ['rg_minConversations', r.minConversations], ['rg_gapMinutes', r.gapMinutes], ['rg_maxMentions', r.restrict.maxMentions]]) if (!keep(id)) $(id).value = v;
-  if (!keep('rg_exempt')) $('rg_exempt').value = r.exemptRoles.join(NL);
+  if (!keep('rg_exempt')) $('rg_exempt').value = r.exemptRoles.join(NL); if (!keep('rg_exemptChannels')) $('rg_exemptChannels').value = (r.exemptChannels || []).join(NL);
 }
-const rgBody = () => ({ on: $('rg_on').checked, notice: $('rg_notice').checked, minDays: $('rg_minDays').value, minConversations: $('rg_minConversations').value, gapMinutes: $('rg_gapMinutes').value, exemptRoles: $('rg_exempt').value,
+const rgBody = () => ({ on: $('rg_on').checked, notice: $('rg_notice').checked, minDays: $('rg_minDays').value, minConversations: $('rg_minConversations').value, gapMinutes: $('rg_gapMinutes').value, exemptRoles: $('rg_exempt').value, exemptChannels: $('rg_exemptChannels').value,
   restrict: { links: $('rg_links').checked, attachments: $('rg_attachments').checked, invites: $('rg_invites').checked, mentions: $('rg_mentions').checked, maxMentions: $('rg_maxMentions').value } });
 $('saveRg').onclick = run(async () => { draw(await api('settings', { regulars: rgBody() })); toast('Saved'); });
 $('rg_on').onchange = run(async () => draw(await api('settings', { regulars: { on: $('rg_on').checked } })));
@@ -223,6 +237,15 @@ const cmBody = () => ({ xp: { on: $('xp_on').checked, announce: $('xp_announce')
   starboard: { on: $('sb_on').checked, threshold: $('sb_threshold').value }, antinuke: { on: $('nk_on').checked, maxActions: $('nk_maxActions').value, seconds: $('nk_seconds').value } });
 $('saveCm').onclick = run(async () => { draw(await api('settings', cmBody())); toast('Saved'); });
 for (const id of ['xp_on', 'sb_on', 'nk_on']) $(id).onchange = run(async () => draw(await api('settings', { [id.startsWith('xp') ? 'xp' : id.startsWith('sb') ? 'starboard' : 'antinuke']: { on: $(id).checked } })));
+
+$('saveBr').onclick = run(async () => { const b = { bridge: { url: $('br_url').value } }; if ($('br_password').value) b.bridgePassword = $('br_password').value; draw(await api('settings', b)); $('br_password').value = ''; toast('Saved'); });
+$('clearBr').onclick = run(async () => { draw(await api('settings', { clearBridgePassword: true })); toast('Password removed'); });
+
+function drawSa(a) { for (const k of ['on', 'boosts', 'joins', 'milestones']) $('sa_' + k).checked = a[k]; if (document.activeElement !== $('sa_milestoneEvery')) $('sa_milestoneEvery').value = a.milestoneEvery; }
+const saBody = () => ({ on: $('sa_on').checked, boosts: $('sa_boosts').checked, joins: $('sa_joins').checked, milestones: $('sa_milestones').checked, milestoneEvery: $('sa_milestoneEvery').value });
+$('saveSa').onclick = run(async () => { draw(await api('settings', { streamAlerts: saBody() })); toast('Saved'); });
+$('sa_on').onchange = run(async () => draw(await api('settings', { streamAlerts: { on: $('sa_on').checked } })));
+$('testSa').onclick = run(async () => { const r = await api('test-stream-alert', {}); toast(r.shown ? 'The alert is on your stream' : 'IMC-Stream got it but has no alert for it: switch on "Discord server boost" in its Alerts page', !r.shown); });
 const load = async () => draw(await api('status'));
 $('saveToken').onclick = run(async () => {
   if ($('token').value.trim()) { draw(await api('settings', { token: $('token').value })); $('token').value = ''; toast('Saved'); }

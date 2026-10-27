@@ -64,3 +64,16 @@ test('a failed send does not stop the rest, and asks for a fresh webhook', async
   for (const t of ['a', 'b']) mir.onEvent({ type: 'chat.message', data: { id: t, uid: 'u', login: 'sam', name: 'Sam', badges: [], type: 'text', text: t } });
   assert.equal(await mir.flush(), 2); assert.deepEqual(forgot, ['M']); assert.equal(mir._sent.size, 1);
 });
+
+test('chatters show their Twitch picture: one request per new person, remembered, and a failure only means no picture', async () => {
+  const sends = [], asked = []; let fail = false;
+  const cfg = { channels: { mirror: 'M' }, mirror: Object.assign(MIRROR(), { avatars: true }) };
+  const mir = createMirror({ config: { get: () => cfg }, log() {}, getWebhook: async () => ({ send: async (m) => { sends.push(m); return { id: 'x' }; }, deleteMessage: async () => {} }),
+    avatars: async (ids) => { asked.push(ids); if (fail) throw new Error('boom'); return Object.fromEntries(ids.map((i) => [i, i === 'u2' ? 'http://insecure/p.png' : 'https://cdn/' + i + '.png'])); } });
+  const say = (uid, text) => mir.onEvent({ type: 'chat.message', data: { id: Math.random(), uid, login: 'l' + uid, name: 'N' + uid, badges: [], type: 'text', text } });
+  say('u1', 'a'); say('u2', 'b'); say('u1', 'c'); await mir.flush();
+  assert.deepEqual(asked, [['u1', 'u2']], 'one request for the whole batch, each person once'); assert.deepEqual(sends.map((s) => s.avatarURL), ['https://cdn/u1.png', undefined, 'https://cdn/u1.png'], 'only https pictures are used');
+  say('u1', 'd'); say('u3', 'e'); await mir.flush(); assert.deepEqual(asked[1], ['u3'], 'u1 and u2 are remembered'); assert.equal(sends.at(-2).avatarURL, 'https://cdn/u1.png');
+  fail = true; say('u4', 'f'); await mir.flush(); assert.equal(sends.at(-1).avatarURL, undefined); assert.equal(sends.at(-1).content, 'f', 'the line still goes out');
+  cfg.mirror.avatars = false; asked.length = 0; say('u5', 'g'); await mir.flush(); assert.equal(asked.length, 0, 'switched off: no requests'); assert.equal(sends.at(-1).avatarURL, undefined);
+});

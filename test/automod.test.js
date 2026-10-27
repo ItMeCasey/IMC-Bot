@@ -82,3 +82,8 @@ test('a wave of joins raises one alert; young accounts are kicked only when aske
   const off = rig(); await off.am.onJoin(joiner('9', 1, off.at())); assert.equal(off.performed.length, 0, 'off by default');
   const dry = rig({ accountAge: { on: true, days: 3 } }, { dryRun: true }); await dry.am.onJoin(joiner('9', 1, dry.at())); assert.equal(dry.performed.length, 0); assert.match(dry.posts[0].embeds[0].title, /Dry run/);
 });
+
+test('chat in an exempt channel is left alone, other channels are not', async () => {
+  const r = rig({ exemptChannels: ['C-FREE'] }), free = r.msg('join discord.gg/abc123'); free.channelId = 'C-FREE'; await r.am.onMessage(free); assert.equal(free.deleted, 0);
+  const other = r.msg('join discord.gg/abc123'); await r.am.onMessage(other); assert.equal(other.deleted, 1);
+});

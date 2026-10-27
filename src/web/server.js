@@ -28,6 +28,12 @@ module.exports = function createWeb(ctx) {
       else if (b.guildId !== undefined) await ctx.discord.registerCommands().catch((e) => log('slash commands:', e.message));
       return status();
     },
+    /** the dashboard's test button: shows a pretend server boost on stream, so the whole way (bot, IMC-Stream, overlay) can be checked */
+    'POST test-stream-alert': async () => {
+      if (!ctx.bridge) throw new Error('The link to IMC-Stream is not running yet');
+      const r = await ctx.bridge.alert('discord_boost', { name: 'TestBooster', boosts: 1, level: 1 });
+      return { ok: true, shown: !!(r && r.shown) };
+    },
     'POST connect': async () => { await ctx.discord.start(); return status(); },
     'POST plan': async () => ctx.setup.plan(await ctx.discord.guild()),
     'POST setup': async () => { const r = await ctx.setup.apply(await ctx.discord.guild()); await ctx.discord.registerCommands().catch((e) => log('slash commands:', e.message)); return r; },
