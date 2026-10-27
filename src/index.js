@@ -16,6 +16,7 @@ const createMirror = require('./modules/mirror');
 const createLogging = require('./modules/logging');
 const createSelfRoles = require('./modules/selfroles');
 const createViewer = require('./modules/viewer');
+const createGiveaway = require('./modules/giveaway');
 
 const ROOT = path.join(__dirname, '..'), DATA = process.env.IMC_BOT_DATA || path.join(ROOT, 'data');
 const log = (...a) => console.log(new Date().toLocaleTimeString(), ...a);
@@ -25,7 +26,7 @@ async function main() {
   const ctx = { config, db, log };
   ctx.kv = createKv(db);
   const late = {};   // modules that need the Discord connection, which is made just below
-  ctx.onReady = (client) => { late.basic.attach(client); late.automod.attach(client); late.logging.attach(client); late.mirror.start(); late.bridge.start(); late.golive.catchUp().catch((e) => log('go-live catch-up:', e.message)); };   // the bridge starts once Discord is online, so no event is handled before it can be posted
+  ctx.onReady = (client) => { late.basic.attach(client); late.automod.attach(client); late.logging.attach(client); late.mirror.start(); late.giveaway.start(); late.bridge.start(); late.golive.catchUp().catch((e) => log('go-live catch-up:', e.message)); };   // the bridge starts once Discord is online, so no event is handled before it can be posted
   ctx.discord = createDiscord(ctx);
   ctx.botId = () => { const c = ctx.discord.client(); return c && c.user ? c.user.id : ''; };
   const hooks = new Map();   // channel id -> the mirror's webhook
@@ -37,6 +38,7 @@ async function main() {
     if (!w) w = await ch.createWebhook({ name: 'IMC-Bot mirror', reason: 'Twitch chat mirror' });
     hooks.set(channelId, w); return w;
   };
+  ctx.fetchGuild = async (id) => { const c = ctx.discord.client(); return c ? c.guilds.fetch(id).catch(() => null) : null; };
   ctx.wantChat = () => !!config.get().mirror.on;
   ctx.fetchChannel = async (id) => { const c = ctx.discord.client(); return c ? c.channels.fetch(id).catch(() => null) : null; };
   late.basic = createBasic(ctx);
@@ -46,6 +48,7 @@ async function main() {
   late.logging = createLogging(ctx);
   late.selfroles = createSelfRoles(ctx);
   late.viewer = createViewer(ctx);
+  late.giveaway = createGiveaway(ctx);
   late.bridge = ctx.bridge = createBridge(ctx);
   late.golive = createGoLive({ ...ctx, channel: async (id) => { const c = ctx.discord.client(); return c ? c.channels.fetch(id).catch(() => null) : null; }, snapshot: () => late.bridge.snapshot() });
   late.bridge.on((ev) => (ev.type.startsWith('chat.') ? late.mirror.onEvent(ev) : late.golive.onEvent(ev)));
@@ -54,7 +57,7 @@ async function main() {
   const port = await web.listen(config.get().port);
   log('IMC-Bot dashboard: http://localhost:' + port);
   if (config.secret('token')) await ctx.discord.start().then((s) => log('Discord: online as', s.bot), (e) => log('Discord:', e.message));
-  const quit = async (exit) => { late.bridge.stop(); late.mirror.stop(); await ctx.discord.stop(); await web.close(); db.close(); if (exit !== false) process.exit(0); };
+  const quit = async (exit) => { late.bridge.stop(); late.mirror.stop(); late.giveaway.stop(); await ctx.discord.stop(); await web.close(); db.close(); if (exit !== false) process.exit(0); };
   if (require.main === module) { process.on('SIGINT', quit); process.on('SIGTERM', quit); }
   return { ctx, late, web, port, quit: () => quit(false) };
 }
