@@ -1,18 +1,68 @@
 {
   "name": "imc-bot",
-  "version": "0.1.0",
+  "productName": "IMC-Bot",
+  "version": "2026.10.27",
   "private": true,
   "description": "Discord bot that moderates and runs a streamer's server, working with IMC-Stream",
+  "author": "ItMeCasey",
   "license": "GPL-3.0-or-later",
-  "main": "src/index.js",
+  "main": "desktop/main.js",
   "engines": {
     "node": ">=22.13"
   },
   "scripts": {
     "start": "node src/index.js",
-    "test": "node --test \"test/*.test.js\""
+    "desktop": "electron .",
+    "test": "node --test \"test/*.test.js\"",
+    "pack": "electron-builder --win --dir",
+    "dist": "electron-builder --win nsis --publish never"
   },
   "dependencies": {
     "discord.js": "^14.16.0"
+  },
+  "devDependencies": {
+    "electron": "^39.8.10",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "com.itmecasey.bot",
+    "productName": "IMC-Bot",
+    "copyright": "ItMeCasey",
+    "directories": {
+      "output": "dist",
+      "buildResources": "desktop/build"
+    },
+    "files": [
+      "desktop/**",
+      "src/**",
+      "public/**",
+      "package.json",
+      "!**/*.md"
+    ],
+    "asar": false,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "desktop/build/icon.ico",
+      "signAndEditExecutable": true
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "IMC-Bot",
+      "uninstallDisplayName": "IMC-Bot",
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "desktop/build/icon.ico",
+      "uninstallerIcon": "desktop/build/icon.ico"
+    }
   }
 }
