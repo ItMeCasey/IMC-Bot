@@ -4,10 +4,22 @@
  * hand each command to its module, and report the state to the dashboard. The features live in src/modules.
  */
 const { Client, GatewayIntentBits: I, Partials, Events, REST, Routes, MessageFlags, PermissionsBitField } = require('discord.js');
-const { NEEDED } = require('../modules/setup');
+const { INVITE_PERMS } = require('../modules/setup');
 
 /** the link that adds the bot to a server (a server install, with just the permissions it uses) */
-const inviteUrl = (appId) => 'https://discord.com/oauth2/authorize?client_id=' + appId + '&scope=bot%20applications.commands&integration_type=0&permissions=' + new PermissionsBitField(NEEDED).bitfield;
+const inviteUrl = (appId) => 'https://discord.com/oauth2/authorize?client_id=' + appId + '&scope=bot%20applications.commands&integration_type=0&permissions=' + new PermissionsBitField(INVITE_PERMS).bitfield;
+
+/** what a person may be told when something fails: our own plain sentences and Discord's own error texts, never internal errors (TypeError and the like) */
+const userMessage = (e) => (e && (e.constructor === Error || /^DiscordAPIError/.test((e.constructor && e.constructor.name) || '')) ? e.message : 'Something went wrong. The details are in the bot log.');
+/** the id of the server an event happened in (events carry it in different places), or '' when it is not about a server */
+const guildIdOf = (a) => (a && (a.guildId || (a.guild && a.guild.id) || (a.message && (a.message.guildId || (a.message.guild && a.message.guild.id))))) || '';
+
+/** makes every listener added later through client.on ignore events from servers other than `getGuildId()` (when one is chosen); returns the original, unfiltered `on` */
+function onlyOurServer(client, getGuildId) {
+  const rawOn = client.on.bind(client);
+  client.on = (event, fn) => rawOn(event, (...args) => { const mine = getGuildId(), gid = mine && args.map(guildIdOf).find(Boolean); if (mine && gid && gid !== mine) return undefined; return fn(...args); });
+  return rawOn;
+}
 
 module.exports = function createDiscord(ctx) {
   const log = ctx.log || (() => {});
@@ -24,18 +36,21 @@ module.exports = function createDiscord(ctx) {
     if (!token) { status = { state: 'offline', bot: '', error: 'Paste the bot token first' }; return status; }
     await stop();
     status = { state: 'connecting', bot: '', error: '' };
-    const c = new Client({ intents: [I.Guilds, I.GuildMembers, I.GuildMessages, I.MessageContent, I.GuildVoiceStates, I.GuildMessageReactions, I.GuildModeration], partials: [Partials.Message, Partials.Channel, Partials.Reaction] });
+    const c = new Client({ allowedMentions: { parse: [] }, intents: [I.Guilds, I.GuildMembers, I.GuildMessages, I.MessageContent, I.GuildVoiceStates, I.GuildMessageReactions, I.GuildModeration], partials: [Partials.Message, Partials.Channel, Partials.Reaction] });
+    // The bot belongs to ONE server. If someone adds it to another, that server's events are ignored (they would otherwise reach this server's logs, starboard and stream alerts).
+    const rawOn = onlyOurServer(c, () => ctx.config.get().guildId);
+    rawOn(Events.GuildCreate, (g) => { const mine = ctx.config.get().guildId; if (mine && g.id !== mine) { log('left the server "' + g.name + '": the bot only works in the server chosen in the dashboard'); g.leave().catch((e) => log('could not leave:', e.message)); } });
     c.on(Events.InteractionCreate, async (i) => {
       if (i.isButton()) {
         const fn = buttons.get(String(i.customId).split(':')[0]);
-        if (fn) try { await fn(i); } catch (e) { log('button', i.customId, 'failed:', e.message); try { await i.reply({ content: 'That did not work: ' + e.message, flags: MessageFlags.Ephemeral }); } catch (x) { /* expired */ } }
+        if (fn) try { await fn(i); } catch (e) { log('button', i.customId, 'failed:', e.message); try { await i.reply({ content: 'That did not work: ' + userMessage(e), flags: MessageFlags.Ephemeral }); } catch (x) { /* expired */ } }
         return;
       }
       if (!i.isChatInputCommand()) return;
       const cmd = commands.get(i.commandName); if (!cmd) return;
       try { await cmd.run(i); } catch (e) {
         log('command', i.commandName, 'failed:', e.message);
-        const m = { content: 'That did not work: ' + e.message, flags: MessageFlags.Ephemeral };
+        const m = { content: 'That did not work: ' + userMessage(e), flags: MessageFlags.Ephemeral };
         try { await (i.deferred || i.replied ? i.followUp(m) : i.reply(m)); } catch (x) { /* the interaction expired */ }
       }
     });
@@ -46,6 +61,7 @@ module.exports = function createDiscord(ctx) {
       status = { state: 'error', bot: '', error: /token/i.test(e.message) ? 'Discord did not accept that token' : e.message }; throw new Error(status.error);
     }
     status = { state: 'online', bot: c.user.tag, error: '', invite: inviteUrl(c.user.id) };
+    const mine = ctx.config.get().guildId; if (mine) for (const g of c.guilds.cache.values()) if (g.id !== mine) log('note: the bot is also in "' + g.name + '", which it ignores. Remove it there, and switch off "Public Bot" in the Developer Portal.');
     if (ctx.onReady) ctx.onReady(c);
     if (ctx.config.get().guildId) await registerCommands().catch((e) => log('slash commands:', e.message));
     return status;
@@ -60,5 +76,6 @@ module.exports = function createDiscord(ctx) {
   }
   const guilds = () => (client ? [...client.guilds.cache.values()].map((g) => ({ id: g.id, name: g.name })) : []);
   const guild = async () => { const id = ctx.config.get().guildId; if (!client || !id) throw new Error('Choose a server first'); return client.guilds.fetch(id); };
-  return { start, stop, register, registerButton, commandList: () => [...commands.values()].map((c) => c.data.toJSON()), registerCommands, guilds, guild, status: () => status, client: () => client };
+  return { userMessage, start, stop, register, registerButton, commandList: () => [...commands.values()].map((c) => c.data.toJSON()), registerCommands, guilds, guild, status: () => status, client: () => client };
 };
+module.exports.userMessage = userMessage; module.exports.guildIdOf = guildIdOf; module.exports.onlyOurServer = onlyOurServer;

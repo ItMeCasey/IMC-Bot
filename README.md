@@ -35,10 +35,16 @@ The bot talks to IMC-Stream over a small bridge (`http://127.0.0.1:8420/api/brid
 To try the bot without streaming, run `node tools/fake-stream.js` (with IMC-Stream closed) and open http://localhost:8420: buttons start and end a stream, change the title, send chat lines, raids and follows, and make a recap.
 
 ## Permissions and privacy
-- The invite link asks only for the permissions the bot uses (manage roles and channels, kick, manage messages, moderate members, view the audit log, manage webhooks, embed links).
-- The bot needs the **Server Members** and **Message Content** intents.
+- The invite link asks only for the permissions the bot uses (manage roles and channels, kick, ban, manage messages, moderate members, view the audit log, manage webhooks, embed links).
+- The bot needs the **Server Members** and **Message Content** intents. In the Developer Portal also switch **Public Bot** off, so nobody else can add your bot to another server (the bot ignores other servers anyway).
 - The token is saved only on your PC and never sent to the dashboard page. The dashboard and the bridge answer only this PC.
 - The bot stores IDs, counts and the text of moderation reasons. Message text is kept only for a moment in Discord's own cache (for the log); tickets keep a transcript only in `#mod-log`.
 
 ## Develop
 `npm test` runs the tests (Node's built-in test runner, no network, no real Discord). `npm run pack` builds an unpacked app and `npm run dist` the installer into `dist/`. Pushing a tag like `v2026.10.27` (matching `package.json`) builds the installer in GitHub Actions and attaches it to a draft release.
+
+## Documentation
+- [How it is built](docs/ARCHITECTURE.md): the layout, the modules, the settings, the database, how to add a feature.
+- [Slash commands](docs/COMMANDS.md): every command, who can use it and its options (generated from the code).
+- [The IMC-Stream bridge](docs/BRIDGE.md): the routes and events between the two programs.
+- [Security](docs/SECURITY.md): what is protected from whom, the design choices, the known limits and the audit history.

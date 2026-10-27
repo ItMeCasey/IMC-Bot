@@ -54,6 +54,7 @@ async function main() {
   ctx.wantChat = () => !!config.get().mirror.on;
   ctx.fetchChannel = async (id) => { const c = ctx.discord.client(); return c ? c.channels.fetch(id).catch(() => null) : null; };
   late.basic = createBasic(ctx);
+  ctx.onModAction = (guild, modId, kind) => { if (late.antinuke) late.antinuke.record(guild, modId, kind).catch((e) => log('anti-nuke failed:', e.message)); };   // bans and kicks made with /ban and /kick
   late.moderation = ctx.moderation = createModeration(ctx);
   late.automod = createAutomod(ctx);
   late.mirror = createMirror(ctx);
@@ -83,5 +84,10 @@ async function main() {
   if (require.main === module) { process.on('SIGINT', quit); process.on('SIGTERM', quit); }
   return { ctx, late, web, port, quit: () => quit(false) };
 }
-if (require.main === module) main().catch((e) => { console.error(e); process.exit(1); });
+if (require.main === module) {
+  // a bug in one handler must never silently stop the bot: log it and carry on
+  process.on('uncaughtException', (e) => log('unexpected error:', e && e.stack || e));
+  process.on('unhandledRejection', (e) => log('unexpected error:', e && e.stack || e));
+  main().catch((e) => { console.error(e); process.exit(1); });
+}
 module.exports = { main };

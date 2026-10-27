@@ -9,7 +9,7 @@ function rig(over) {
   const ch = { send: async (m) => { if (over && over.failSend) throw new Error('Missing Access'); sent.push(m); return { id: 'msg' + sent.length }; }, messages: { edit: async (id, m) => edits.push([id, m]) } };
   const p = createPolls({ db, log() {}, now: () => t, fetchChannel: async (id) => (id === 'C1' ? ch : null), discord: { register: (c) => cmds.set(c.data.name, c), registerButton: (pr, f) => { btns[pr] = f; } } });
   const guild = { id: 'G' };
-  const run = async (sub, o) => { const out = []; await cmds.get('poll').run({ guild, channelId: 'C1', channel: ch, user: { id: 'HOST' }, options: { getSubcommand: () => sub, getString: (n) => o[n] ?? null, getInteger: (n) => o[n] ?? null }, reply: async (m) => out.push(m.content) }); return out[0]; };
+  const run = async (sub, o) => { const out = []; await cmds.get('poll').run({ memberPermissions: { has: () => true }, guild, channelId: 'C1', channel: ch, user: { id: 'HOST' }, options: { getSubcommand: () => sub, getString: (n) => o[n] ?? null, getInteger: (n) => o[n] ?? null }, reply: async (m) => out.push(m.content) }); return out[0]; };
   const vote = async (id, c, uid) => { const out = []; await btns.poll({ customId: 'poll:' + id + ':' + c, guild, user: { id: uid }, reply: async (m) => out.push(m.content), update: async (m) => out.push(m) }); return out[0]; };
   return { p, db, cmds, sent, edits, run, vote, tick: (ms) => { t += ms; } };
 }

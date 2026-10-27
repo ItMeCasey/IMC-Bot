@@ -9,6 +9,7 @@
 const crypto = require('node:crypto');
 const { SlashCommandBuilder, PermissionFlagsBits: F, MessageFlags, Events } = require('discord.js');
 const { COLOR, embed } = require('../theme');
+const { requirePerm } = require('../perms');
 const { whyNot } = require('./selfroles');
 
 const EPHEMERAL = MessageFlags.Ephemeral, MIN_LENGTH = 5;
@@ -68,7 +69,8 @@ module.exports = function createXp(ctx) {
   } });
   const adm = new SlashCommandBuilder().setName('xp').setDescription('Mods: manage XP').setDMPermission(false).setDefaultMemberPermissions(F.ManageGuild)
     .addSubcommand((s) => s.setName('reset').setDescription('Reset someone to zero XP').addUserOption((o) => o.setName('user').setDescription('The person').setRequired(true)));
-  ctx.discord.register({ data: adm, run: async (i) => { const u = i.options.getUser('user', true); q.del.run(i.guild.id, u.id); return i.reply({ content: 'Reset <@' + u.id + '> to zero XP.', flags: EPHEMERAL, allowedMentions: { parse: [] } }); } });
+  ctx.discord.register({ data: adm, run: async (i) => {
+    requirePerm(i, F.ManageGuild); const u = i.options.getUser('user', true); q.del.run(i.guild.id, u.id); return i.reply({ content: 'Reset <@' + u.id + '> to zero XP.', flags: EPHEMERAL, allowedMentions: { parse: [] } }); } });
 
   const attach = (c) => c.on(Events.MessageCreate, (m) => onMessage(m).catch((e) => log('xp failed:', e.message)));
   return { attach, onMessage, levelFor, need, roleRules };

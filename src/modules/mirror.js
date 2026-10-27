@@ -25,6 +25,7 @@ module.exports = function createMirror(ctx) {
   const sent = new Map();   // twitch message id -> { uid, discordId, channelId }, the last few, so a delete can follow
 
   const link = /\bhttps?:\/\/\S+|\bwww\.\S+/gi;
+  const invite = /(?:https?:\/\/)?(?:www\.)?(?:discord\.gg|discord(?:app)?\.com\/invite|dsc\.gg)\/[a-z0-9-]+/gi;   // a Discord invite is never passed on, whatever the link setting
   /** the line for Discord, or null when this message should not be mirrored */
   function render(d) {
     const m = M();
@@ -34,7 +35,7 @@ module.exports = function createMirror(ctx) {
     if (m.hideCommands && m.commandPrefixes.some((p) => text.startsWith(p))) return null;
     const badges = d.badges || [];
     if (m.minRole !== 'all' && !ROLE_NEEDS[m.minRole].some((b) => badges.includes(b))) return null;
-    let body = escapeMarkdown(cut(m.stripLinks ? text.replace(link, '[link]') : text, 1500));
+    let body = escapeMarkdown(cut((m.stripLinks ? text.replace(link, '[link]') : text).replace(invite, '[invite]'), 1500));
     body = body.replace(/@(everyone|here)/gi, '@​$1').replace(/<(@[!&]?|#)(\d+)>/g, '<​$1$2>');   // no pings, whatever Twitch users type
     const icons = m.showBadges ? [...new Set(badges.map((b) => BADGE_ICON[b]).filter(Boolean))].join('') : '';
     const reply = d.reply ? '↪ **' + escapeMarkdown(cut(d.reply.name || '', 40)) + '**: ' + escapeMarkdown(cut(d.reply.text || '', 80)) + '\n' : '';

@@ -40,25 +40,25 @@ test('config: moderation settings are clamped and old files get the new defaults
 function rig(over) {
   const db = openDb(':memory:'), calls = [], posts = [], dms = [], cmds = new Map(), btns = {}, fail = {};
   const cfg = Object.assign({ channels: { modLog: 'L' }, dryRun: false, moderation: { dmUser: true, decayDays: 30, ladder: { timeoutAt: 2, timeoutMinutes: 60, banAt: 3 } } }, over);
-  const members = {
+  const members = { pos: {}, gone: new Set(),
     me: { id: 'BOT', roles: { highest: { position: 20 } } }, fetchMe: async () => members.me,
-    fetch: async (id) => ({ timeout: async (ms, w) => { if (fail.timeout) throw fail.timeout; calls.push(['timeout', id, ms, w]); } }),
+    fetch: async (id) => (members.gone && members.gone.has(id) ? Promise.reject(new Error('Unknown Member')) : { roles: { highest: { position: members.pos[id] == null ? 5 : members.pos[id] } }, timeout: async (ms, w) => { if (fail.timeout) throw fail.timeout; calls.push(['timeout', id, ms, w]); } }),
     kick: async (id, w) => calls.push(['kick', id, w]), unban: async (id, w) => { if (fail.unban) throw fail.unban; calls.push(['unban', id, w]); },
     ban: async (id, o) => { if (fail.ban) throw fail.ban; calls.push(['ban', id, o]); },
   };
   const guild = { id: 'G', name: 'Test server', ownerId: 'OWNER', members };
   const logCh = { send: async (m) => { posts.push(m); } };
-  const ctx = { db, config: { get: () => cfg }, log() {}, botId: () => 'BOT', fetchChannel: async (id) => (id === 'L' ? logCh : null), now: () => 1e12,
+  const lockMemory = new Map(), ctx = { kv: { get: (k) => lockMemory.get(k) || '', set: (k, v) => lockMemory.set(k, v) }, db, config: { get: () => cfg }, log() {}, botId: () => 'BOT', fetchChannel: async (id) => (id === 'L' ? logCh : null), now: () => 1e12,
     discord: { register: (c) => cmds.set(c.data.name, c), registerButton: (p, f) => { btns[p] = f; } } };
   const mod = createModeration(ctx);
   const target = (id) => ({ id, tag: id + '#1', send: async (m) => { dms.push([id, m]); } });
   /** an interaction by a moderator (position 10) on a target whose top role is at `pos` */
-  const ix = (opts, o) => { o = o || {}; const replies = []; return { replies, guild, user: { id: o.by || 'MOD', tag: 'mod#1' }, member: { roles: { highest: { position: o.myPos || 10 } } },
+  const ix = (opts, o) => { o = o || {}; const replies = []; return { replies, memberPermissions: { has: () => true }, guild, user: { id: o.by || 'MOD', tag: 'mod#1' }, member: { roles: { highest: { position: o.myPos || 10 } } },
     options: { getUser: (n) => (opts[n] ? target(opts[n]) : null), getMember: (n) => (opts[n] && !opts.absent ? { roles: { highest: { position: o.pos == null ? 5 : o.pos } } } : null),
       getString: (n) => (opts[n] == null ? null : opts[n]), getInteger: (n) => (opts[n] == null ? null : opts[n]) },
     deferReply: async () => {}, editReply: async (m) => { replies.push(m); } }; };
   const run = async (name, opts, o) => { const i = ix(opts, o); await cmds.get(name).run(i); return i.replies.at(-1); };
-  return { mod, cmds, btns, calls, posts, dms, db, fail, run, ix, cfg };
+  return { mod, cmds, btns, calls, posts, dms, db, fail, run, ix, cfg, guild, members, ctx };
 }
 
 test('warn records a case, tells the person, posts to #mod-log with Undo and counts active warnings', async () => {
@@ -116,24 +116,79 @@ test('unwarn, note, case and history', async () => {
   assert.match((await r.run('history', { user: 'NEW' })).embeds[0].description, /Clean record/);
 });
 
-test('Undo button lifts a ban or timeout once, only for mods, and removes itself', async () => {
+/** a press of the Undo button by `uid` who has these permissions and whose top role is at `pos` */
+function undoPress(r, uid, perms, pos) {
+  const i = { customId: 'undo:1', guild: r.guild, user: { id: uid, tag: uid + '#1' }, member: { roles: { highest: { position: pos == null ? 10 : pos } } }, memberPermissions: { has: (p) => perms.includes(p) }, out: [],
+    reply: async (m) => i.out.push(['reply', m.content]), update: async (m) => i.out.push(['update', m.components]) };
+  return i;
+}
+
+test('Undo needs the permission of the action it undoes (Ban Members for a ban), lifts it once, and removes itself', async () => {
   const r = rig(); await r.run('ban', { user: 'U', reason: 'b' });
-  const press = (perm) => { const i = { customId: 'undo:1', guild: { id: 'G', members: { unban: async (id, w) => r.calls.push(['unban', id, w]) } }, user: { id: 'M2', tag: 'm2#1' }, memberPermissions: { has: (p) => perm && p === F.ModerateMembers }, out: [], reply: async (m) => i.out.push(['reply', m.content]), update: async (m) => i.out.push(['update', m.components]) }; return i; };
-  const no = press(false); await r.btns.undo(no); assert.deepEqual(no.out, [['reply', 'Only mods can undo.']]); assert.equal(r.mod.cases.get('G', 1).undone_at, null);
-  const yes = press(true); await r.btns.undo(yes); assert.deepEqual(yes.out, [['update', []]]); assert.equal(r.calls.at(-1)[0], 'unban'); assert.match(r.calls.at(-1)[2], /Undo of case 1 by m2#1/);
+  const none = undoPress(r, 'M2', []); await r.btns.undo(none); assert.match(none.out[0][1], /Only mods can undo a ban/); assert.equal(r.mod.cases.get('G', 1).undone_at, null);
+  const timeoutMod = undoPress(r, 'M2', [F.ModerateMembers]); await r.btns.undo(timeoutMod); assert.match(timeoutMod.out[0][1], /Ban Members/, 'a mod who can only time people out cannot lift a ban');
+  assert.equal(r.calls.filter((c) => c[0] === 'unban').length, 0);
+  const yes = undoPress(r, 'M2', [F.BanMembers]); await r.btns.undo(yes); assert.deepEqual(yes.out, [['update', []]]); assert.equal(r.calls.at(-1)[0], 'unban'); assert.match(r.calls.at(-1)[2], /Undo of case 1 by M2#1/);
   assert.ok(r.mod.cases.get('G', 1).undone_at); assert.ok(r.posts.some((p) => /Case #1 undone/.test(p.embeds[0].title)));
-  const again = press(true); await r.btns.undo(again); assert.deepEqual(again.out, [['update', []]]); assert.equal(r.calls.filter((c) => c[0] === 'unban').length, 1, 'not twice');
+  const again = undoPress(r, 'M2', [F.BanMembers]); await r.btns.undo(again); assert.deepEqual(again.out, [['update', []]]); assert.equal(r.calls.filter((c) => c[0] === 'unban').length, 1, 'not twice');
+  const gone = undoPress(r, 'M2', [F.BanMembers]); gone.customId = 'undo:99'; await r.btns.undo(gone); assert.match(gone.out[0][1], /gone/);
 });
 
-test('purge, slowmode, lock and unlock do their job and are logged', async () => {
+test('Undo follows the role rules: not your own case, not someone above you, not a case a higher-ranked mod made; the owner may', async () => {
+  const r = rig(); await r.run('timeout', { user: 'U', duration: '1h' }, { by: 'BOSS' }); r.members.pos.BOSS = 50; r.members.pos.U = 5;
+  const self = undoPress(r, 'U', [F.ModerateMembers]); await r.btns.undo(self); assert.match(self.out[0][1], /cannot do that to yourself/, 'nobody lifts their own timeout');
+  const lower = undoPress(r, 'M2', [F.ModerateMembers], 10); await r.btns.undo(lower); assert.match(lower.out[0][1], /higher role made this case/, 'a lower-ranked mod cannot undo what the boss did'); assert.equal(r.mod.cases.get('G', 1).undone_at, null);
+  r.members.pos.U = 15; const above = undoPress(r, 'M2', [F.ModerateMembers], 10); await r.btns.undo(above); assert.match(above.out[0][1], /as high as yours/, 'the target outranks them');
+  r.members.pos.U = 5; const peer = undoPress(r, 'BOSS2', [F.ModerateMembers], 60); r.members.pos.BOSS2 = 60; await r.btns.undo(peer); assert.deepEqual(peer.out, [['update', []]], 'a higher-ranked mod may');
+  assert.equal(r.calls.at(-1)[0], 'timeout'); assert.equal(r.calls.at(-1)[2], null, 'the timeout was lifted');
+  const o = rig(); await o.run('warn', { user: 'U', reason: 'x' }, { by: 'BOSS' }); o.members.pos.BOSS = 50; const owner = undoPress(o, 'OWNER', [F.ModerateMembers], 1); await o.btns.undo(owner); assert.deepEqual(owner.out, [['update', []]], 'the server owner may undo anything');
+});
+
+test('every command checks the real permission when it runs, not only the default Discord hides it with', async () => {
+  const r = rig(), try1 = async (name, opts, perms) => { const i = r.ix(opts); i.memberPermissions = { has: (p) => perms.includes(p) }; return r.cmds.get(name).run(i); };
+  await assert.rejects(try1('ban', { user: 'U' }, [F.ModerateMembers]), /You need the "BanMembers" permission/); await assert.rejects(try1('warn', { user: 'U', reason: 'x' }, []), /ModerateMembers/); await assert.rejects(try1('purge', { count: 1 }, [F.ModerateMembers]), /ManageMessages/);
+  await assert.rejects(try1('lock', {}, []), /ManageChannels/); assert.equal(r.db.prepare('SELECT COUNT(*) AS n FROM cases').get().n, 0, 'nothing was done');
+  await try1('warn', { user: 'U', reason: 'x' }, [F.ModerateMembers]); assert.equal(r.mod.cases.get('G', 1).type, 'warn', 'with the permission it works');
+});
+
+test('/untimeout respects the hierarchy and /unwarn cannot clear your own record', async () => {
+  const r = rig(); await assert.rejects(r.run('untimeout', { user: 'U' }, { pos: 10 }), /as high as yours/);
+  const c = r.mod.cases.create({ guildId: 'G', type: 'warn', target: 'MOD', moderator: 'OTHER', reason: 'mine', decayDays: 30 });
+  await assert.rejects(r.run('unwarn', { case: c.id }), /cannot remove your own warnings/); assert.equal(r.mod.cases.get('G', c.id).undone_at, null);
+  const o = r.mod.cases.create({ guildId: 'G', type: 'warn', target: 'SOMEONE', moderator: 'OTHER', reason: 'theirs', decayDays: 30 }); assert.match((await r.run('unwarn', { case: o.id })).content, /Removed warning/);
+  assert.match((await r.run('unwarn', { case: c.id }, { by: 'OWNER' })).content, /Removed warning/, 'the owner may');
+});
+
+test('bans and kicks made with /ban and /kick are reported to anti-nuke, but not the warn ladder itself, not unbans and not warnings', async () => {
+  const r = rig(), seen = []; r.ctx.onModAction = (g, mod, kind) => seen.push([mod, kind]);
+  await r.run('ban', { user: 'U1', reason: 'x' }, { by: 'M1' }); await r.run('kick', { user: 'U2', reason: 'x' }, { by: 'M1' }); await r.run('unban', { user_id: '123456789' }, { by: 'M1' }); await r.run('warn', { user: 'U3', reason: 'x' }, { by: 'M1' });
+  assert.deepEqual(seen, [['M1', 'ban'], ['M1', 'kick']]);
+  const l = rig(), seen2 = []; l.ctx.onModAction = (g, mod, kind) => seen2.push([mod, kind]); for (const n of [1, 2, 3]) await l.run('warn', { user: 'W', reason: 'w' + n }, { by: 'M1' });
+  assert.equal(l.calls.at(-1)[0], 'ban', 'the ladder banned'); assert.deepEqual(seen2, [], 'the ladder ban is not a moderator going wild');
+  const broken = rig(); broken.ctx.onModAction = () => { throw new Error('boom'); }; assert.match((await broken.run('ban', { user: 'U1' }, { by: 'M1' })).content, /Banned/, 'a failing hook never stops the ban');
+});
+
+test('purge and slowmode do their job and are logged; lock remembers how the channel was and unlock puts exactly that back', async () => {
   const r = rig(), deleted = []; let slow = null; const edits = [];
   const msgs = new Map([...Array(5).keys()].map((n) => [String(n), { id: String(n), author: { id: n % 2 ? 'A' : 'B' } }]));
-  const i0 = r.ix({ count: 3, user: 'A' }); i0.channel = { id: 'C', messages: { fetch: async () => msgs }, bulkDelete: async (list) => { deleted.push(...list.map((m) => m.id)); return { size: list.length }; }, setRateLimitPerUser: async (s) => { slow = s; }, permissionOverwrites: { edit: async (role, o) => edits.push(o) } };
-  i0.guild = Object.assign({}, i0.guild, { roles: { everyone: { id: 'G' } } });
+  const overwrite = { v: null };   // what @everyone has in the channel right now
+  const chan = (id) => ({ id, messages: { fetch: async () => msgs }, bulkDelete: async (list) => { deleted.push(...list.map((m) => m.id)); return { size: list.length }; }, setRateLimitPerUser: async (s) => { slow = s; },
+    permissionOverwrites: { cache: { get: () => overwrite.v }, edit: async (role, o) => edits.push(o) } });
+  const withChan = (opts, c) => { const i = r.ix(opts); i.channel = c; i.guild = Object.assign({}, i.guild, { roles: { everyone: { id: 'G' } } }); return i; };
+  const c1 = chan('C1'); const i0 = withChan({ count: 3, user: 'A' }, c1);
   await r.cmds.get('purge').run(i0); assert.deepEqual(deleted, ['1', '3'], 'only that person, newest requested'); assert.match(i0.replies.at(-1).content, /Deleted 2/);
-  const i1 = r.ix({ seconds: 30 }); i1.channel = i0.channel; await r.cmds.get('slowmode').run(i1); assert.equal(slow, 30);
-  const i2 = r.ix({}); i2.channel = i0.channel; i2.guild = i0.guild; await r.cmds.get('lock').run(i2); await r.cmds.get('unlock').run(i2); assert.deepEqual(edits, [{ SendMessages: false }, { SendMessages: null }]);
-  assert.ok(r.posts.length >= 4, 'each one is in #mod-log');
+  await r.cmds.get('slowmode').run(withChan({ seconds: 30 }, c1)); assert.equal(slow, 30);
+  // a channel with no setting: locked, then unlocked back to "not set"
+  await r.cmds.get('lock').run(withChan({}, c1)); await r.cmds.get('unlock').run(withChan({}, c1)); assert.deepEqual(edits, [{ SendMessages: false }, { SendMessages: null }]);
+  // a channel that was read-only on purpose (an explicit deny, like #rules): unlock keeps it read-only
+  edits.length = 0; const c2 = chan('C2'); overwrite.v = { deny: { has: (p) => p === F.SendMessages }, allow: { has: () => false } };
+  await r.cmds.get('lock').run(withChan({}, c2)); await r.cmds.get('lock').run(withChan({}, c2)); await r.cmds.get('unlock').run(withChan({}, c2)); assert.deepEqual(edits, [{ SendMessages: false }, { SendMessages: false }, { SendMessages: false }], 'locking twice does not forget the original');
+  // a channel that explicitly allowed writing
+  edits.length = 0; const c3 = chan('C3'); overwrite.v = { deny: { has: () => false }, allow: { has: (p) => p === F.SendMessages } };
+  await r.cmds.get('lock').run(withChan({}, c3)); await r.cmds.get('unlock').run(withChan({}, c3)); assert.deepEqual(edits, [{ SendMessages: false }, { SendMessages: true }]);
+  // a channel the bot did not lock is not unlocked
+  await assert.rejects(r.cmds.get('unlock').run(withChan({}, chan('C4'))), /did not lock this channel/); await assert.rejects(r.cmds.get('unlock').run(withChan({}, c3)), /did not lock this channel/, 'and not twice');
+  assert.ok(r.posts.length >= 6, 'each one is in #mod-log');
 });
 
 test('slash commands are hidden from people without the matching permission, and cannot be used in DMs', () => {

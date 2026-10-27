@@ -9,11 +9,11 @@ function rig(cfgOver) {
   const db = openDb(':memory:'), cmds = new Map(), btns = {}, sent = [], edits = [];
   const ch = { id: 'S1', send: async (m) => { sent.push(m); return { id: 'msg' + sent.length }; }, messages: { edit: async (id, m) => edits.push([id, m]) } };
   const cfg = Object.assign({ channels: { suggestions: 'S1' } }, cfgOver);
-  createSuggestions({ db, log() {}, now: () => 1e12, config: { get: () => cfg }, fetchChannel: async (id) => (id === 'S1' ? ch : null), discord: { register: (c) => cmds.set(c.data.name, c), registerButton: (p, f) => { btns[p] = f; } } });
+  const clock = { t: 1e12 }; createSuggestions({ db, log() {}, now: () => clock.t, config: { get: () => cfg }, fetchChannel: async (id) => (id === 'S1' ? ch : null), discord: { register: (c) => cmds.set(c.data.name, c), registerButton: (p, f) => { btns[p] = f; } } });
   const guild = { id: 'G' };
-  const run = async (name, o, sub) => { const out = []; await cmds.get(name).run({ guild, user: { id: 'U1', tag: 'sam#1' }, options: { getString: (n) => o[n] ?? null, getInteger: (n) => o[n] ?? null, getSubcommand: () => sub }, reply: async (m) => out.push(m.content) }); return out[0]; };
+  const run = async (name, o, sub) => { const out = []; await cmds.get(name).run({ memberPermissions: { has: () => true }, guild, user: { id: 'U1', tag: 'sam#1' }, options: { getString: (n) => o[n] ?? null, getInteger: (n) => o[n] ?? null, getSubcommand: () => sub }, reply: async (m) => out.push(m.content) }); return out[0]; };
   const press = async (id, uid) => { const out = []; await btns.sg({ customId: id, guild, user: { id: uid }, reply: async (m) => out.push(m.content), update: async (m) => out.push(m) }); return out[0]; };
-  return { cmds, sent, edits, run, press, cfg };
+  return { cmds, sent, edits, run, press, cfg, clock };
 }
 
 test('/suggest posts a card with two vote buttons in #suggestions', async () => {
@@ -38,4 +38,9 @@ test('mods answer a suggestion: the card changes and voting closes on deny and d
   await assert.rejects(r.run('suggestion', { id: 9 }, 'done'), /No such suggestion/);
   const j = r.cmds.get('suggestion').data.toJSON(); assert.equal(j.default_member_permissions, F.ManageMessages.toString()); assert.equal(r.cmds.get('suggest').data.toJSON().default_member_permissions, undefined);
   assert.equal(await r.press('sg:up:99', 'A'), 'That suggestion is gone.');
+});
+
+test('one suggestion every 30 seconds per person', async () => {
+  const r = rig(); await r.run('suggest', { idea: 'one' }); await assert.rejects(r.run('suggest', { idea: 'two' }), /wait a little/); assert.equal(r.sent.length, 1);
+  r.clock.t += 31000; await r.run('suggest', { idea: 'three' }); assert.equal(r.sent.length, 2);
 });

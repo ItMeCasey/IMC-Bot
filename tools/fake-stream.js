@@ -30,6 +30,7 @@ function createFake(opts) {
       .map(([p, t]) => '<button style="font:inherit;font-weight:700;margin:4px;padding:10px 14px;background:#F39120;border:0;cursor:pointer" onclick="fetch(\'/fake/' + p + '\').then(r=>r.text()).then(t=>s.textContent=t)">' + t + '</button>').join('') + '<pre id=s style="color:#4FBBBC"></pre>';
 
   const server = http.createServer((req, res) => {
+    if (!/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(req.headers.host || '')) { res.writeHead(403); return res.end('Blocked'); }   // only this computer (also not through a DNS trick)
     const u = new URL(req.url, 'http://localhost'), p = u.pathname, q = Object.fromEntries(u.searchParams), send = (code, o, type) => { res.writeHead(code, { 'Content-Type': type || 'application/json' }); res.end(typeof o === 'string' ? o : JSON.stringify(o)); };
     if (p === '/') return send(200, PAGE, 'text/html; charset=utf-8');
     if (p === '/api/bridge/info') return send(200, INFO);

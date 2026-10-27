@@ -11,9 +11,10 @@
  */
 const { SlashCommandBuilder, PermissionFlagsBits: F, MessageFlags, Events } = require('discord.js');
 const { COLOR, embed } = require('../theme');
+const { requirePerm } = require('../perms');
 
 const DAY = 86400000, EPHEMERAL = MessageFlags.Ephemeral, SWEEP_MS = 3600000;
-const LINK = /\b(?:https?:\/\/|www\.)\S+/i;
+const { hosts } = require('../links');
 const INVITE = /(?:discord\.gg|discord(?:app)?\.com\/invite|dsc\.gg)\/[a-z0-9-]+/i;
 const cut = (t, n) => (String(t).length > n ? String(t).slice(0, n - 1) + '…' : String(t));
 
@@ -88,17 +89,18 @@ module.exports = function createRegulars(ctx) {
   function broken(m, mentionCount) {
     const r = R().restrict, text = String(m.content || '');
     if (r.invites && INVITE.test(text)) return 'invite links';
-    if (r.links && LINK.test(text)) return 'links';
+    if (r.links && hosts(text).length) return 'links';
     if (r.attachments && m.attachments && m.attachments.size > 0) return 'images and files';
     if (r.mentions && mentionCount > r.maxMentions) return 'mentioning that many people';
     return null;
   }
   const logLine = async (title, body) => { const id = cfg().channels.modLog; if (!id) return; try { const ch = await ctx.fetchChannel(id); if (ch) await ch.send({ embeds: [embed(title, cut(body, 1500), COLOR.cream)], allowedMentions: { parse: [] } }); } catch (e) { log('mod log failed:', e.message); } };
 
-  async function onMessage(m) {
+  /** a new message, or (edited = true) an edited one: the limits apply again, and it is not counted as taking part again */
+  async function onMessage(m, edited) {
     if (!m.guild || !m.author || m.author.bot || m.webhookId || m.system || !R().on) return;
     const guild = m.guild, member = m.member; if (!member) return;
-    track(guild.id, m.channelId, m.author.id, member.joinedTimestamp);
+    if (edited) stat(guild.id, m.author.id, member.joinedTimestamp); else track(guild.id, m.channelId, m.author.id, member.joinedTimestamp);
     const role = await roleOf(guild, false);
     if (!exempt(member, role) && !(R().exemptChannels || []).includes(m.channelId)) {
       const mc = m.mentions ? (m.mentions.users ? m.mentions.users.size : 0) + (m.mentions.roles ? m.mentions.roles.size : 0) + (m.mentions.everyone ? 1 : 0) : 0, what = broken(m, mc);
@@ -131,6 +133,7 @@ module.exports = function createRegulars(ctx) {
   const reg = new SlashCommandBuilder().setName('regular').setDescription('Mods: look at, grant or remove the Regular role').setDMPermission(false).setDefaultMemberPermissions(F.ModerateMembers);
   sub(reg, 'status', 'Someone\'s progress'); sub(reg, 'grant', 'Make someone a Regular now'); sub(reg, 'revoke', 'Remove the role and hold them back');
   ctx.discord.register({ data: reg, run: async (i) => {
+    requirePerm(i, F.ModerateMembers);
     const user = i.options.getUser('user', true), member = i.options.getMember('user'), g = i.guild, which = i.options.getSubcommand();
     if (!member) throw new Error('That person is not in this server.'); if (user.bot) throw new Error('Bots are not tracked.');
     const s = stat(g.id, user.id, member.joinedTimestamp), role = await roleOf(g, which === 'grant');
@@ -143,6 +146,6 @@ module.exports = function createRegulars(ctx) {
   let timer = null;
   const start = () => { if (!timer) { timer = setInterval(() => sweep().catch((e) => log('regular sweep failed:', e.message)), SWEEP_MS); if (timer.unref) timer.unref(); } };
   const stop = () => { clearInterval(timer); timer = null; };
-  const attach = (c) => { c.on(Events.MessageCreate, (m) => onMessage(m).catch((e) => log('regulars failed:', e.message))); c.on(Events.GuildMemberAdd, onJoin); };
+  const attach = (c) => { c.on(Events.MessageCreate, (m) => onMessage(m).catch((e) => log('regulars failed:', e.message))); c.on(Events.MessageUpdate, (a, b) => (b && b.content != null && !b.partial && a.content !== b.content ? onMessage(b, true).catch((e) => log('regulars failed:', e.message)) : undefined)); c.on(Events.GuildMemberAdd, onJoin); };
   return { attach, start, stop, onMessage, onJoin, track, sweep, progress, maybePromote, _convs: convs };
 };

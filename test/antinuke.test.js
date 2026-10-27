@@ -52,7 +52,7 @@ function vrig(roleOver) {
   const guild = { id: 'G', members: { me: { roles: { highest: { position: 10 } } } }, roles: { cache: { get: (id) => rolesById.get(id), find: (fn) => [...rolesById.values()].find(fn) }, fetch: async () => null,
     create: async (o) => { created.push(o); const r = role('V1', o.name, roleOver); rolesById.set('V1', r); return r; } } };
   const v = createVerify({ log() {}, config: { get: () => ({ verify: { roleName: 'Verified' } }) }, kv: { get: (k) => kv.get(k) || '', set: (k, x) => kv.set(k, x) }, discord: { register: (c) => cmds.set(c.data.name, c), registerButton: (p, f) => { btns[p] = f; } } });
-  const slash = (o) => { const out = []; return { out, guild, channel: { send: async (m) => sent.push(m) }, options: { getString: (n) => (o || {})[n] ?? null }, deferReply: async () => {}, editReply: async (m) => out.push(m.content) }; };
+  const slash = (o) => { const out = []; return { out, memberPermissions: { has: () => true }, user: { id: 'U1' }, member: { roles: { highest: { position: 10 } } }, guild, channel: { send: async (m) => sent.push(m) }, options: { getString: (n) => (o || {})[n] ?? null }, deferReply: async () => {}, editReply: async (m) => out.push(m.content) }; };
   const press = (has) => { const out = [], added = []; return { out, added, guild, member: { roles: { cache: new Set(has ? ['V1'] : []), add: async (r, why) => added.push([r, why]) } }, reply: async (m) => out.push(m.content) }; };
   return { v, cmds, btns, sent, created, slash, press, rolesById };
 }

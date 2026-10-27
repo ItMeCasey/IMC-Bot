@@ -7,6 +7,7 @@
  */
 const { SlashCommandBuilder, PermissionFlagsBits: F, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { COLOR, embed } = require('../theme');
+const { requirePerm } = require('../perms');
 const { whyNot } = require('./selfroles');
 
 const EPHEMERAL = MessageFlags.Ephemeral;
@@ -23,8 +24,9 @@ module.exports = function createVerify(ctx) {
   ctx.discord.register({ data: new SlashCommandBuilder().setName('verifypanel').setDescription('Post a message with a Verify button').setDMPermission(false).setDefaultMemberPermissions(F.ManageRoles)
     .addStringOption((o) => o.setName('title').setDescription('Heading (default: Verify)').setMaxLength(100))
     .addStringOption((o) => o.setName('text').setDescription('What to tell newcomers').setMaxLength(500)), run: async (i) => {
+    requirePerm(i, F.ManageRoles);
     await i.deferReply({ flags: EPHEMERAL });
-    const me = i.guild.members.me || await i.guild.members.fetchMe(), role = await roleOf(i.guild), why = whyNot(role, me.roles.highest.position, i.guild.id); if (why) throw new Error(why);
+    const me = i.guild.members.me || await i.guild.members.fetchMe(), role = await roleOf(i.guild), why = whyNot(role, me.roles.highest.position, i.guild.id, i.user.id === i.guild.ownerId ? null : i.member.roles.highest.position); if (why) throw new Error(why);
     await i.channel.send({ embeds: [embed(i.options.getString('title') || 'Verify', i.options.getString('text') || 'Read the rules, then press the button to get access to the server.', COLOR.aqua)], allowedMentions: { parse: [] },
       components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('verify:go').setLabel('Verify').setStyle(ButtonStyle.Success))] });
     return i.editReply({ content: 'Posted the verification panel. The role is **' + role.name + '**. Remember to hide your channels from @everyone and show them to that role.' });

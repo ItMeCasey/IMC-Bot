@@ -134,3 +134,18 @@ test('without the password the bot says what to do, in plain words', async () =>
   await b.poll(); assert.match(b.status().error, /asks for its remote-access password: enter it in the dashboard/);
   s.refuse = true; await b.poll(); assert.match(b.status().error, /switch on remote access in its Setup page/);
 });
+
+test('a request that hangs is given up after the timeout, and a run id that keeps changing does not loop', async () => {
+  const seen = []; let n = 0;
+  const hang = createLocalBridge({ config: cfg(), kv: memKv(), log() {}, fetch: async (u, o) => { seen.push(!!(o && o.signal)); throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' }); } });
+  await hang.poll(); assert.ok(seen.every(Boolean), 'every request carries a timeout'); assert.equal(hang.status().state, 'offline'); assert.match(hang.status().error, /not reachable at that address/);
+  const flip = createLocalBridge({ config: cfg(), kv: memKv(), log() {}, fetch: async () => ({ ok: true, status: 200, json: async () => ({ boot: 'b' + ++n, cursor: 5, events: [] }) }) });
+  await flip.poll(); const before = n; await flip.poll(); assert.ok(n - before <= 2, 'a changing run id causes at most one extra request per round, not a loop (' + (n - before) + ')');
+});
+
+test('a recap cannot carry a Discord invite into #announcements', async () => {
+  const posts = [], cfgx = { get: () => ({ bridge: { url: 'x' }, channels: { announcements: 'A' }, goLive: { on: true, ping: '' } }) };
+  const g = createGoLive({ config: cfgx, kv: memKv(), delayMs: 0, channel: async () => ({ send: async (m) => posts.push(m) }), snapshot: async () => ({}), log() {} });
+  await g.onEvent({ type: 'recap', data: { text: 'Chat said join https://discord.gg/evil123 and discord.com/invite/zzz, also @everyone' } });
+  assert.doesNotMatch(posts[0].embeds[0].description, /discord\.gg|\/invite\//); assert.match(posts[0].embeds[0].description, /\[invite\]/); assert.deepEqual(posts[0].allowedMentions, { parse: [] });
+});

@@ -10,6 +10,7 @@ const crypto = require('node:crypto');
 const { SlashCommandBuilder, PermissionFlagsBits: F, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { COLOR, embed } = require('../theme');
 const { parseDuration, fmtDuration } = require('./cases');
+const { requirePerm } = require('../perms');
 
 const EPHEMERAL = MessageFlags.Ephemeral;
 const MIN_MS = 10000, MAX_MS = 30 * 86400000, TICK_MS = 15000;
@@ -73,8 +74,14 @@ module.exports = function createGiveaway(ctx) {
   }
 
   /** time is up (or a mod pressed end): close it, draw, announce */
+  const tries = new Map();   // giveaway id -> failed draws, so a draw that can never work is given up after a few tries
+  /** closes the giveaway ("ending" while drawing, so nobody ends it twice), draws and announces; a failed draw is tried again on the next tick */
   async function finish(g) {
-    if (q.status.run('ended', g.id, 'open').changes === 0) return null;   // someone else already ended it
+    if (q.status.run('ending', g.id, 'open').changes === 0) return null;   // someone else is already ending it
+    try { const w = await finishInner(g); q.status.run('ended', g.id, 'ending'); tries.delete(g.id); return w; }
+    catch (e) { const n = (tries.get(g.id) || 0) + 1; tries.set(g.id, n); q.status.run(n >= 5 ? 'ended' : 'open', g.id, 'ending'); throw e; }
+  }
+  async function finishInner(g) {
     const winners = await draw(g, g.winners), entries = q.count.get(g.id).n, m = await messageOf(g);
     if (m && m.id) {
       await m.ch.messages.edit(m.id, { embeds: [endedEmbed(g, winners, entries)], components: [entryRow(g.id, true)], allowedMentions: { parse: [] } }).catch((e) => log('giveaway edit failed:', e.message));
@@ -101,6 +108,7 @@ module.exports = function createGiveaway(ctx) {
     .addSubcommand((s) => s.setName('list').setDescription('The giveaways that are running'));
 
   async function run(i) {
+    requirePerm(i, F.ManageMessages);
     const sub = i.options.getSubcommand(), gid = i.guild.id;
     if (sub === 'start') {
       const ms = parseDuration(i.options.getString('duration', true));
