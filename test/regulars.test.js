@@ -79,7 +79,7 @@ test('the role is created when missing, and found again by name', async () => {
 
 test('/progress shows how far along you are; /regular lets mods look, grant and hold back', async () => {
   const r = rig({ minConversations: 3 }), a = r.mk('A', { joined: T0 - 3 * DAY }), b = r.mk('B'); await conv(r, a, b);
-  const run = async (name, opts, user, sub) => { const out = []; await r.cmds.get(name).run({ guild: r.guild, user: { id: user.id, tag: user.id + '#1' }, member: user, options: { getUser: () => opts && { id: opts.id, tag: opts.id + '#1', bot: false }, getMember: () => opts && r.guild.members._get(opts.id), getSubcommand: () => sub }, reply: async (m) => out.push(m) }); return out[0]; };
+  const run = async (name, opts, user, sub) => { const out = []; await r.cmds.get(name).run({ memberPermissions: { has: () => true }, guild: r.guild, user: { id: user.id, tag: user.id + '#1' }, member: user, options: { getUser: () => opts && { id: opts.id, tag: opts.id + '#1', bot: false }, getMember: () => opts && r.guild.members._get(opts.id), getSubcommand: () => sub }, reply: async (m) => out.push(m) }); return out[0]; };
   r.guild.members._get = (id) => ({ A: a, B: b }[id]);
   const me = await run('progress', null, a); assert.match(me.embeds[0].description, /Days in the server: \*\*3\/7\*\*, conversations: \*\*1\/3\*\*/);
   const st = await run('regular', { id: 'A' }, b, 'status'); assert.match(st.embeds[0].description, /3\/7/);
@@ -95,4 +95,14 @@ test('new members may post links and images in an exempt channel, but still not 
   const free = r.msg(n, 'https://example.com', { ch: 'MEMES' }); await r.reg.onMessage(free); assert.equal(free.deleted, 0);
   const other = r.msg(n, 'https://example.com', { ch: 'C1' }); await r.reg.onMessage(other); assert.equal(other.deleted, 1);
   const stat = r.db.prepare('SELECT conversations FROM member_stats WHERE user_id = ?').get('NEW'); assert.ok(stat, 'chat there is still counted toward becoming a Regular');
+});
+
+test('newcomers cannot dodge the link limit with an address without https://, or by editing a clean message; an edit is not a conversation', async () => {
+  const r = rig(), n = r.mk('NEW', { joined: T0 - 2 * DAY });
+  const bare = r.msg(n, 'free nitro at evil.gg/x'); await r.reg.onMessage(bare); assert.equal(bare.deleted, 1, 'evil.gg/x');
+  const ok = r.msg(n, 'hello everyone'); await r.reg.onMessage(ok); assert.equal(ok.deleted, 0);
+  ok.content = 'hello https://evil.example.com'; await r.reg.onMessage(ok, true); assert.equal(ok.deleted, 1, 'edited into a link');
+  const other = r.mk('OTHER'); await r.reg.onMessage(r.msg(other, 'hi'));   // a real message from someone else: this is the conversation
+  const before = r.db.prepare('SELECT conversations FROM member_stats WHERE user_id = ?').get('NEW').conversations; const edit = r.msg(other, 'hi there edited'); await r.reg.onMessage(edit, true);
+  assert.equal(r.db.prepare('SELECT conversations FROM member_stats WHERE user_id = ?').get('NEW').conversations, before, 'an edit does not make a conversation');
 });

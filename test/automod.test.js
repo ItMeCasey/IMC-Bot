@@ -87,3 +87,22 @@ test('chat in an exempt channel is left alone, other channels are not', async ()
   const r = rig({ exemptChannels: ['C-FREE'] }), free = r.msg('join discord.gg/abc123'); free.channelId = 'C-FREE'; await r.am.onMessage(free); assert.equal(free.deleted, 0);
   const other = r.msg('join discord.gg/abc123'); await r.am.onMessage(other); assert.equal(other.deleted, 1);
 });
+
+test('addresses without https:// are caught by the links rule, and the allowed-sites list still applies to them', () => {
+  const r = rig(); r.cfg.automod.spam.on = false; r.cfg.automod.duplicate.on = false; r.cfg.automod.links.on = true;
+  assert.equal(verdict(r, 'free stuff at evil.gg/x').rule, 'links'); assert.equal(verdict(r, 'EVIL.com').rule, 'links'); assert.equal(verdict(r, 'evil.me/free').rule, 'links');
+  assert.equal(verdict(r, 'see twitch.tv/itmecasey and clips.twitch.tv/abc'), null, 'allowed sites, with or without https://'); assert.equal(verdict(r, 'node.js is fine, so is done.in'), null);
+});
+
+test('editing a clean message into a rule break is caught, and an edit is not counted as spam', async () => {
+  const r = rig(); const m = r.msg('hello there');
+  await r.am.onMessage(m); assert.equal(m.deleted, 0);
+  m.content = 'join discord.gg/abc123'; await r.am.onMessage(m, true); assert.equal(m.deleted, 1, 'the edited text is checked again'); assert.equal(r.performed.length, 1);
+  const s = rig({ spam: { on: true, count: 2, seconds: 6 } }); const a = s.msg('first'); await s.am.onMessage(a); const b = s.msg('second but edited'); await s.am.onMessage(b, true); assert.equal(b.deleted, 0, 'the speed rules are not applied to an edit');
+});
+
+test('the per-person message history stays bounded however many different people write', () => {
+  const r = rig(); r.cfg.automod.spam.on = false; r.cfg.automod.duplicate.on = false;
+  for (let n = 0; n < 6000; n++) r.am.evaluate({ userId: 'U' + n, content: 'hi', mentionCount: 0 }, r.cfg.automod);
+  assert.ok(r.am._recent.size <= 5000, 'kept ' + r.am._recent.size);
+});

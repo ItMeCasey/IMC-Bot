@@ -9,9 +9,9 @@
  */
 const { Events, PermissionFlagsBits: F } = require('discord.js');
 const { COLOR } = require('../theme');
+const { hosts } = require('../links');
 
 const INVITE = /(?:discord\.gg|discord(?:app)?\.com\/invite|dsc\.gg)\/[a-z0-9-]+/i;
-const URL_RE = /\b(?:https?:\/\/|www\.)([^\s/?#<>"']+)/gi;
 const CUSTOM_EMOJI = /<a?:\w+:\d+>/g;
 const UNICODE_EMOJI = /\p{Extended_Pictographic}/gu;
 const cut = (t, n) => (String(t).length > n ? String(t).slice(0, n - 1) + '…' : String(t));
@@ -28,8 +28,7 @@ module.exports = function createAutomod(ctx) {
     a = a || A(); const text = String(m.content || '');
     if (a.invites.on && INVITE.test(text)) return { rule: 'invites', text: 'invite links are not allowed here' };
     if (a.links.on) {
-      for (const hit of text.matchAll(URL_RE)) {
-        const host = hit[1].toLowerCase().replace(/^www\./, '').replace(/:\d+$/, '');
+      for (const host of hosts(text)) {   // addresses with or without "https://", so "evil.gg/x" does not slip through
         if (!a.links.allow.some((d) => host === d || host.endsWith('.' + d))) return { rule: 'links', text: 'links to ' + host + ' are not allowed here' };
       }
     }
@@ -45,7 +44,7 @@ module.exports = function createAutomod(ctx) {
     }
     // the repeat rules look at this person's last messages
     const t = now(), list = (recent.get(m.userId) || []).filter((x) => t - x.t < 60000);
-    list.push({ t, text: norm(text) }); recent.set(m.userId, list);
+    list.push({ t, text: norm(text) }); recent.set(m.userId, list); if (recent.size > 5000) recent.delete(recent.keys().next().value);   // the oldest person's history goes first, so memory stays bounded
     if (a.duplicate.on && text.trim() && list.filter((x) => t - x.t < a.duplicate.seconds * 1000 && x.text === norm(text)).length >= a.duplicate.count) { recent.delete(m.userId); return { rule: 'duplicate', text: 'please do not repeat yourself' }; }
     if (a.spam.on && list.filter((x) => t - x.t < a.spam.seconds * 1000).length >= a.spam.count) { recent.delete(m.userId); return { rule: 'spam', text: 'you are sending messages too fast' }; }
     return null;
@@ -57,11 +56,12 @@ module.exports = function createAutomod(ctx) {
     try { const ch = await ctx.fetchChannel(id); if (ch) await ch.send({ embeds: [{ title, description: cut(body, 1500), color: color || COLOR.cream }], allowedMentions: { parse: [] } }); } catch (e) { log('mod log failed:', e.message); }
   };
 
-  async function onMessage(m) {
+  /** a new message, or (edited = true) a message that was edited: the content rules apply again, the speed rules (spam, repeats) do not */
+  async function onMessage(m, edited) {
     if (!m.guild || !m.author || m.author.bot || m.webhookId || m.system) return;
     const a = A(); if (!a.on || exempt(m.member) || (a.exemptChannels || []).includes(m.channelId)) return;
     const mc = m.mentions ? (m.mentions.users ? m.mentions.users.size : 0) + (m.mentions.roles ? m.mentions.roles.size : 0) + (m.mentions.everyone ? 1 : 0) : 0;
-    const v = evaluate({ userId: m.author.id, content: m.content, mentionCount: mc }, a); if (!v) return;
+    const v = evaluate({ userId: m.author.id, content: m.content, mentionCount: mc }, edited ? Object.assign({}, a, { spam: Object.assign({}, a.spam, { on: false }), duplicate: Object.assign({}, a.duplicate, { on: false }) }) : a); if (!v) return;
     const snippet = cut(m.content || '', 200), where = '<@' + m.author.id + '> in <#' + m.channelId + '>';
     if (cfg().dryRun) return logLine('Dry run: AutoMod would remove a message (' + v.rule + ')', where + '\n> ' + snippet, COLOR.cream);
     await m.delete().catch(() => {});
@@ -92,6 +92,6 @@ module.exports = function createAutomod(ctx) {
     }
     return undefined;
   }
-  const attach = (client) => { client.on(Events.MessageCreate, (m) => onMessage(m).catch((e) => log('automod failed:', e.message))); client.on(Events.GuildMemberAdd, (m) => onJoin(m).catch((e) => log('automod join failed:', e.message))); };
+  const attach = (client) => { client.on(Events.MessageCreate, (m) => onMessage(m).catch((e) => log('automod failed:', e.message))); client.on(Events.MessageUpdate, (a, b) => (b && b.content != null && !b.partial && a.content !== b.content ? onMessage(b, true).catch((e) => log('automod failed:', e.message)) : undefined)); /* an edit must not be a way round the rules */ client.on(Events.GuildMemberAdd, (m) => onJoin(m).catch((e) => log('automod join failed:', e.message))); };
   return { evaluate, onMessage, onJoin, attach, _recent: recent };
 };

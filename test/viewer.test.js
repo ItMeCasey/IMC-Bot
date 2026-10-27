@@ -23,7 +23,7 @@ test('the seven commands are registered, public, and say so plainly when the str
   createViewer({ discord: { register: (c) => cmds.set(c.data.name, c) }, bridge: { snapshot: async () => { if (down) throw new Error('x'); return LIVE; }, info: async () => INFO } });
   assert.deepEqual([...cmds.keys()], ['commands', 'games', 'tts', 'top', 'live', 'website', 'schedule']);
   assert.equal(cmds.get('top').data.toJSON().default_member_permissions, undefined, 'everybody can use them');
-  const run = async (n) => { const out = []; await cmds.get(n).run({ deferReply: async () => {}, editReply: async (m) => out.push(m) }); return out[0]; };
+  let who = 0; const run = async (n, uid) => { const out = []; await cmds.get(n).run({ user: { id: uid || 'U' + ++who }, deferReply: async () => {}, reply: async (m) => out.push(m), editReply: async (m) => out.push(m) }); return out[0]; };
   const ok = await run('top'); assert.match(ok.embeds[0].description, /Sam/); assert.deepEqual(ok.allowedMentions, { parse: [] });
   down = true; assert.match((await run('top')).content, /cannot reach the stream app/); assert.match((await run('live')).content, /cannot reach/);
 });
@@ -33,4 +33,14 @@ test('/schedule lists the next streams with Discord times, strikes out canceled 
   const d = a('schedule', LIVE, { segments: [{ start: new Date(t).toISOString(), title: 'Tetris night', category: 'Tetris', canceled: false }, { start: new Date(t + 86400000).toISOString(), title: 'Chill', category: '', canceled: true }] }).embeds[0].description;
   assert.equal(d, '<t:' + sec + ':F> (<t:' + sec + ':R>) **Tetris night** (Tetris)\n~~<t:' + (sec + 86400) + ':F> (<t:' + (sec + 86400) + ':R>) **Chill**~~ canceled');
   assert.equal(a('schedule', LIVE, { segments: [] }).embeds[0].description, 'No streams are scheduled right now.\nhttps://twitch.tv/itmecasey');
+});
+
+test('each person may use a viewer command once every 5 seconds; the commands list shows only what everyone may use', async () => {
+  let t = 1e12; const cmds = new Map(), asked = [];
+  createViewer({ now: () => t, discord: { register: (c) => cmds.set(c.data.name, c) }, bridge: { snapshot: async () => { asked.push('s'); return LIVE; }, info: async () => INFO } });
+  const run = async (uid) => { const out = []; await cmds.get('top').run({ user: { id: uid }, deferReply: async () => {}, reply: async (m) => out.push(['reply', m]), editReply: async (m) => out.push(['edit', m]) }); return out; };
+  assert.equal((await run('A'))[0][0], 'edit'); const again = await run('A'); assert.equal(again[0][0], 'reply'); assert.match(again[0][1].content, /Slow down/); assert.equal(asked.length, 1, 'IMC-Stream was not asked a second time');
+  assert.equal((await run('B'))[0][0], 'edit', 'another person is not affected'); t += 5001; assert.equal((await run('A'))[0][0], 'edit', 'after 5 seconds it works again');
+  const info = { commands: { custom: [['!hi', 'Everyone', 'Says hi'], ['!sub', 'Subscribers', 'Sub only'], ['!mod', 'Moderators', 'Mod only'], ['!me', 'Broadcaster', 'Streamer only']], groups: { Fun: [['!dance', 'everyone', 'Dance'], ['!vip', 'VIPs', 'VIP only']], 'Mods only': [['!ban', 'Everyone', 'x']] } } };
+  const d = createViewer.answer('commands', LIVE, info).embeds[0].description; assert.match(d, /!hi/); assert.match(d, /!dance/); for (const hidden of ['!sub', '!mod', '!me', '!vip', '!ban']) assert.doesNotMatch(d, new RegExp(hidden), hidden + ' is not for everyone');
 });

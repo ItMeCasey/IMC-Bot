@@ -20,7 +20,7 @@ function rig(over, cfgOver) {
   const xp = createXp({ db, log() {}, now: () => t, rand: (lo) => lo, config: { get: () => cfg }, discord: { register: (c) => cmds.set(c.data.name, c) } });
   const msg = (uid, text, o) => { o = o || {}; const sent = [], roleSet = new Set(o.roles || []); return { sent, guild, author: { id: uid, bot: !!o.bot }, webhookId: o.webhook, system: false, content: text, channel: { send: async (m) => sent.push(m) },
     member: { roles: { cache: roleSet, add: async (r, why) => { roleSet.add(r); added.push([uid, r, why]); } } } }; };
-  const run = async (name, o, sub) => { const out = []; await cmds.get(name).run({ guild, user: { id: 'ME', username: 'me' }, options: { getUser: (n) => o && o[n] || null, getSubcommand: () => sub }, reply: async (m) => out.push(m) }); return out[0]; };
+  const run = async (name, o, sub) => { const out = []; await cmds.get(name).run({ memberPermissions: { has: () => true }, guild, user: { id: 'ME', username: 'me' }, options: { getUser: (n) => o && o[n] || null, getSubcommand: () => sub }, reply: async (m) => out.push(m) }); return out[0]; };
   return { xp, db, cmds, added, msg, run, cfg, tick: (ms) => { t += ms; } };
 }
 

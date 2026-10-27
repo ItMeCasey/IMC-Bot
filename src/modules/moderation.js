@@ -10,6 +10,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits: F, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { COLOR, embed } = require('../theme');
 const createCases = require('./cases');
+const { requirePerm } = require('../perms');
 const { parseDuration, fmtDuration } = createCases;
 
 const MAX_TIMEOUT = 28 * 86400000;
@@ -79,6 +80,7 @@ module.exports = function createModeration(ctx) {
       else if (f.type === 'unban') await act.unban(g, id0, w);
       else if (f.type === 'untimeout') await act.untimeout(g, id0, w);
     } catch (e) { cases.undo(g.id, c.id); throw new Error(describe(e)); }   // it did not happen, so the case must not stand
+    if ((f.type === 'ban' || f.type === 'kick') && (f.source || 'discord') === 'discord' && ctx.onModAction) { try { ctx.onModAction(g, f.mod, f.type); } catch (e) { log('anti-nuke feed failed:', e.message); } }
     if (f.type === 'warn' || f.type === 'timeout') await tell(f.user, g, c, f.type === 'warn' ? 'Active warnings: ' + cases.activeWarnings(g.id, id0) : '');
     await postCase(c);
     return c;
@@ -103,7 +105,7 @@ module.exports = function createModeration(ctx) {
     const b = new SlashCommandBuilder().setName(name).setDescription(desc).setDMPermission(false);
     if (perm) b.setDefaultMemberPermissions(perm);
     if (build) build(b);
-    ctx.discord.register({ data: b, run: async (i) => { await i.deferReply({ flags: EPHEMERAL }); await run(i); } });
+    ctx.discord.register({ data: b, run: async (i) => { if (perm) requirePerm(i, perm); await i.deferReply({ flags: EPHEMERAL }); await run(i); } });
   };
   const userOpt = (b, desc) => b.addUserOption((o) => o.setName('user').setDescription(desc || 'The person').setRequired(true));
   const reasonOpt = (b, req) => b.addStringOption((o) => o.setName('reason').setDescription('Why').setMaxLength(500).setRequired(!!req));
@@ -124,7 +126,8 @@ module.exports = function createModeration(ctx) {
     await done(i, 'Timed out <@' + user.id + '> for ' + fmtDuration(ms) + ' (case #' + c.id + ').');
   });
   cmd('untimeout', 'Lift a timeout', F.ModerateMembers, (b) => { userOpt(b); reasonOpt(b); }, async (i) => {
-    const user = i.options.getUser('user', true); if (!i.options.getMember('user')) throw new Error('That person is not in this server.');
+    const user = i.options.getUser('user', true), member = i.options.getMember('user'); if (!member) throw new Error('That person is not in this server.');
+    await guard(i, user, member);
     const c = await perform(i.guild, { type: 'untimeout', user, reason: i.options.getString('reason') || '', ...modInfo(i) });
     await done(i, 'Lifted the timeout on <@' + user.id + '> (case #' + c.id + ').');
   });
@@ -147,6 +150,7 @@ module.exports = function createModeration(ctx) {
   cmd('unwarn', 'Remove a warning (so it stops counting)', F.ModerateMembers, (b) => b.addIntegerOption((o) => o.setName('case').setDescription('The case number').setRequired(true).setMinValue(1)), async (i) => {
     const c = cases.get(i.guild.id, i.options.getInteger('case', true));
     if (!c || c.type !== 'warn') throw new Error('That is not a warning case.');
+    if (c.target_discord_id === i.user.id && i.user.id !== i.guild.ownerId) throw new Error('You cannot remove your own warnings.');
     if (!cases.undo(i.guild.id, c.id)) throw new Error('That warning was already removed.');
     await postLine('Warning #' + c.id + ' removed', '<@' + c.target_discord_id + '> by <@' + i.user.id + '>');
     await done(i, 'Removed warning #' + c.id + '. <@' + c.target_discord_id + '> now has ' + cases.activeWarnings(i.guild.id, c.target_discord_id) + ' active.');
@@ -176,19 +180,39 @@ module.exports = function createModeration(ctx) {
     const s = i.options.getInteger('seconds', true); await i.channel.setRateLimitPerUser(s, 'By ' + i.user.tag);
     await postLine('Slowmode ' + (s ? s + ' s' : 'off'), '<#' + i.channel.id + '> by <@' + i.user.id + '>'); await done(i, s ? 'Slowmode is ' + s + ' s.' : 'Slowmode is off.');
   });
-  for (const [name, lock] of [['lock', true], ['unlock', false]]) {
-    cmd(name, lock ? 'Stop everyone from talking in this channel' : 'Let everyone talk in this channel again', F.ManageChannels, null, async (i) => {
-      await i.channel.permissionOverwrites.edit(i.guild.roles.everyone, { SendMessages: lock ? false : null }, { reason: 'By ' + i.user.tag });
-      await postLine('Channel ' + (lock ? 'locked' : 'unlocked'), '<#' + i.channel.id + '> by <@' + i.user.id + '>', lock ? COLOR.rust : COLOR.aqua); await done(i, lock ? 'Locked.' : 'Unlocked.');
-    });
-  }
+  // /lock remembers how @everyone could write in the channel before (denied, allowed, or not set) and /unlock puts exactly that back,
+  // so a channel that was read-only on purpose (rules, announcements) does not become writable for everyone.
+  const lockKey = (ch) => 'lock.' + ch.id, store = ctx.kv || { get: () => '', set: () => {} };
+  cmd('lock', 'Stop everyone from talking in this channel', F.ManageChannels, null, async (i) => {
+    if (!store.get(lockKey(i.channel))) {
+      const ow = i.channel.permissionOverwrites.cache && i.channel.permissionOverwrites.cache.get(i.guild.roles.everyone.id);
+      store.set(lockKey(i.channel), ow ? (ow.deny.has(F.SendMessages) ? 'deny' : ow.allow.has(F.SendMessages) ? 'allow' : 'none') : 'none');
+    }
+    await i.channel.permissionOverwrites.edit(i.guild.roles.everyone, { SendMessages: false }, { reason: 'By ' + i.user.tag });
+    await postLine('Channel locked', '<#' + i.channel.id + '> by <@' + i.user.id + '>', COLOR.rust); await done(i, 'Locked.');
+  });
+  cmd('unlock', 'Let everyone talk in this channel again (only for a channel locked with /lock)', F.ManageChannels, null, async (i) => {
+    const before = store.get(lockKey(i.channel));
+    if (!before) throw new Error('I did not lock this channel, so I will not unlock it. Change it in the channel settings.');
+    await i.channel.permissionOverwrites.edit(i.guild.roles.everyone, { SendMessages: before === 'deny' ? false : before === 'allow' ? true : null }, { reason: 'By ' + i.user.tag });
+    store.set(lockKey(i.channel), '');
+    await postLine('Channel unlocked', '<#' + i.channel.id + '> by <@' + i.user.id + '>', COLOR.aqua); await done(i, 'Unlocked.');
+  });
 
   // ------------------------------------------------------------------ the Undo button in #mod-log
   async function onUndo(i) {
-    if (!i.memberPermissions || !i.memberPermissions.has(F.ModerateMembers)) return i.reply({ content: 'Only mods can undo.', flags: EPHEMERAL });
     const g = i.guild, c = cases.get(g.id, String(i.customId).split(':')[1]);
     if (!c) return i.reply({ content: 'That case is gone.', flags: EPHEMERAL });
+    // lifting a ban takes the ban permission, anything else the timeout permission: the same as doing it
+    const need = c.type === 'ban' ? F.BanMembers : F.ModerateMembers;
+    if (!i.memberPermissions || !i.memberPermissions.has(need)) return i.reply({ content: 'Only mods can undo' + (c.type === 'ban' ? ' a ban (it needs the Ban Members permission)' : '') + '.', flags: EPHEMERAL });
     if (c.undone_at) return i.update({ components: [] });
+    // the same role rules as for the action itself: not on yourself, not on someone above you, not a case a higher-ranked mod made
+    const target = await g.members.fetch(c.target_discord_id).catch(() => null), by = c.moderator && c.moderator !== ctx.botId() ? await g.members.fetch(c.moderator).catch(() => null) : null;
+    try {
+      await guard(i, { id: c.target_discord_id }, target);
+      if (by && i.user.id !== g.ownerId && by.roles.highest.position > i.member.roles.highest.position) throw new Error('A moderator with a higher role made this case.');
+    } catch (e) { return i.reply({ content: e.message, flags: EPHEMERAL }); }
     const w = 'Undo of case ' + c.id + ' by ' + (i.user.tag || i.user.id);
     try {
       if (c.type === 'ban') await act.unban(g, c.target_discord_id, w);

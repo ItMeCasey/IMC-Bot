@@ -1,0 +1,11 @@
+# Weekly pull requests for newer versions of the npm packages and of the pinned GitHub Actions (the pins are exact commits, so they only move this way).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

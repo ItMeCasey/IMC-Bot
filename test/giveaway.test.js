@@ -11,7 +11,7 @@ function rig(over) {
   const guild = { id: 'G1', members: { fetch: async (id) => { if (!MEMBERS[id]) throw new Error('Unknown Member'); return { user: { bot: !!MEMBERS[id].bot }, roles: { cache: new Set(MEMBERS[id].roles || []) } }; } } };
   const ctx = Object.assign({ db, log() {}, now: () => t, rand: (max) => max - 1, fetchChannel: async (id) => (id === 'C1' ? ch : null), fetchGuild: async (id) => (id === 'G1' ? guild : null), discord: { register: (c) => cmds.set(c.data.name, c), registerButton: (p, f) => { btns[p] = f; } } }, over);
   const g = createGiveaway(ctx);
-  const slash = (sub, o) => { o = o || {}; const out = []; return { out, guild, channelId: 'C1', channel: ch, user: { id: o.by || 'HOST' }, options: { getSubcommand: () => sub, getString: (n) => o[n] ?? null, getInteger: (n) => o[n] ?? null, getRole: (n) => o[n] ?? null },
+  const slash = (sub, o) => { o = o || {}; const out = []; return { out, memberPermissions: { has: () => true }, guild, channelId: 'C1', channel: ch, user: { id: o.by || 'HOST' }, options: { getSubcommand: () => sub, getString: (n) => o[n] ?? null, getInteger: (n) => o[n] ?? null, getRole: (n) => o[n] ?? null },
     reply: async (m) => out.push(m), deferReply: async () => {}, editReply: async (m) => out.push(m) }; };
   const press = (id, uid, roles) => { const out = []; return { out, customId: 'gw:' + id, guild, user: { id: uid }, member: { roles: { cache: new Set(roles || []) } }, reply: async (m) => out.push(m.content) }; };
   return { g, db, cmds, btns, sent, edits, slash, press, run: async (sub, o) => { const i = slash(sub, o); await cmds.get('giveaway').run(i); return i.out.at(-1); }, tick: (ms) => { t += ms; } };
@@ -72,4 +72,13 @@ test('a restart in the middle of a giveaway loses nothing: a new instance ends i
 
 test('the command is for people who can manage messages (mods) and not usable in DMs', () => {
   const r = rig(), j = r.cmds.get('giveaway').data.toJSON(); assert.equal(j.default_member_permissions, '8192'); assert.equal(j.dm_permission, false); assert.deepEqual(j.options.map((o) => o.name), ['start', 'end', 'cancel', 'reroll', 'list']);
+});
+
+test('a draw that fails is tried again on the next tick, and given up after five failures; nobody can end it twice at once', async () => {
+  const r = rig({ fetchGuild: async () => null }); await r.run('start', { prize: 'P', duration: '1m' }); await r.btns.gw(r.press(1, 'A')); r.tick(120000);
+  const status = () => r.db.prepare('SELECT status FROM giveaways WHERE id = 1').get().status;
+  for (let n = 1; n <= 4; n++) { await r.g.tick(); assert.equal(status(), 'open', 'still open after failure ' + n + ': it will be tried again'); }
+  await r.g.tick(); assert.equal(status(), 'ended', 'given up after five failures, so it does not fail forever'); assert.equal(r.sent.length, 1, 'nothing was announced');
+  const ok = rig(); await ok.run('start', { prize: 'P', duration: '1m' }); await ok.btns.gw(ok.press(1, 'A')); ok.tick(120000);
+  const g = ok.db.prepare('SELECT * FROM giveaways WHERE id = 1').get(); const both = await Promise.all([ok.g.finish(g), ok.g.finish(g)]); assert.equal(both.filter(Boolean).length, 1, 'only one of two simultaneous ends does the draw'); assert.equal(ok.sent.length, 2);
 });

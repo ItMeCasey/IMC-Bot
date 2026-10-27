@@ -1,9 +1,10 @@
 'use strict';
 /** IMC-Bot: the desktop app. Runs the Discord bot in the background, shows the dashboard in a window, lives in the tray. */
-const { app, BrowserWindow, Tray, Menu, nativeImage, shell, Notification } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, shell, Notification, session } = require('electron');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs'), path = require('node:path');
 
+app.enableSandbox();   // every window runs in Chromium's sandbox
 const ROOT = path.join(__dirname, '..');   // the app folder (src/, public/, node_modules/)
 const BUILD = path.join(__dirname, 'build');
 app.setPath('userData', path.join(app.getPath('appData'), 'IMC-Bot'));
@@ -28,6 +29,7 @@ function readPort() { try { const p = Number(JSON.parse(fs.readFileSync(path.joi
 function startBot() {
   if (child || quitting) return;
   port = readPort(); fs.mkdirSync(DATA, { recursive: true });
+  for (const f of ['bot.log', 'app.log']) { try { const file = path.join(DATA, f); if (fs.statSync(file).size > 5e6) fs.renameSync(file, file + '.1'); } catch (e) { /* no log yet */ } }   // one old copy is kept
   const out = fs.createWriteStream(path.join(DATA, 'bot.log'), { flags: 'a' });
   child = spawn(process.execPath, [path.join(ROOT, 'src', 'index.js')], { cwd: ROOT, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env: Object.assign({}, process.env, { ELECTRON_RUN_AS_NODE: '1', IMC_BOT_DATA: DATA }) });
   child.stdout.pipe(out, { end: false }); child.stderr.pipe(out, { end: false });
@@ -60,7 +62,9 @@ const SPLASH = 'data:text/html;charset=utf-8,' + encodeURIComponent('<body style
 async function waitForBot() { for (let i = 0; i < 120; i++) { try { const r = await fetch(url('/api/status')); if (r.ok) return; } catch (e) { /* not yet */ } await new Promise((x) => setTimeout(x, 500)); } }
 function openWindow() {
   if (!win) {
-    win = new BrowserWindow({ width: 1100, height: 900, minWidth: 700, minHeight: 600, show: false, backgroundColor: '#222A2A', icon: icon('window.png'), autoHideMenuBar: true, title: 'IMC-Bot' });
+    // the window shows only the local dashboard: no Node in the page, an isolated context, the sandbox on, no remote code, no web views
+    win = new BrowserWindow({ width: 1100, height: 900, minWidth: 700, minHeight: 600, show: false, backgroundColor: '#222A2A', icon: icon('window.png'), autoHideMenuBar: true, title: 'IMC-Bot',
+      webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, allowRunningInsecureContent: false, webviewTag: false, spellcheck: false } });
     win.once('ready-to-show', () => win.show());
     win.on('close', (e) => { if (!quitting && settings.closeToTray) { e.preventDefault(); win.hide(); } });
     win.on('closed', () => { win = null; });
@@ -86,6 +90,9 @@ function refreshTray() {
   ]));
 }
 
+// The dashboard needs no browser permissions (camera, microphone, location, notifications...), so every request is refused, and no page can add a web view.
+app.whenReady().then(() => session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => cb(false)));
+app.on('web-contents-created', (e, wc) => wc.on('will-attach-webview', (ev) => ev.preventDefault()));
 app.on('second-instance', () => openWindow());
 app.on('before-quit', () => { quitting = true; clearInterval(poll); stopBot(); });
 app.on('window-all-closed', () => { /* the tray keeps the app alive */ });

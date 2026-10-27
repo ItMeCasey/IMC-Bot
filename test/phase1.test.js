@@ -105,3 +105,50 @@ test('the Discord alert settings are clamped like the others', () => {
   const c = createConfig(tmp()), v = c.set({ streamAlerts: { on: true, joins: true, milestoneEvery: 1, evil: 1 } });
   assert.deepEqual(v.streamAlerts, { on: true, boosts: true, joins: true, milestones: true, milestoneEvery: 10 });
 });
+
+test('dashboard: only its own page may change things (scheme, host and port), a bad Origin cannot crash it, files cannot be reached from outside, security headers are on', async () => {
+  const dir = tmp(), pub = path.join(dir, 'public'); fs.mkdirSync(pub); fs.mkdirSync(path.join(dir, 'public2')); fs.writeFileSync(path.join(pub, 'index.html'), '<p>hi</p>'); fs.writeFileSync(path.join(pub, 'app.js'), '1'); fs.writeFileSync(path.join(dir, 'public2', 'secret.txt'), 'secret');
+  const config = createConfig(path.join(dir, 'data')), discord = { status: () => ({ state: 'offline', bot: '', error: '' }), guilds: () => [], start: async () => {}, stop: async () => {}, registerCommands: async () => {}, guild: async () => ({}) };
+  const web = createWeb({ config, discord, setup: {}, publicDir: pub, log() {} }), port = await web.listen(0);
+  const req = (method, p, headers, body) => new Promise((resolve, reject) => { const r = http.request({ host: '127.0.0.1', port, path: p, method, headers: Object.assign({ 'Content-Type': 'application/json' }, headers) }, (res) => { let d = ''; res.on('data', (c) => (d += c)); res.on('end', () => resolve({ code: res.statusCode, body: d, headers: res.headers })); }); r.on('error', reject); r.end(body); });
+  const self = 'http://127.0.0.1:' + port;
+  try {
+    assert.equal((await req('POST', '/api/settings', { Origin: self }, '{}')).code, 200, 'the dashboard page itself');
+    assert.equal((await req('POST', '/api/settings', { Origin: 'http://localhost:' + port }, '{}')).code, 403, 'a different host name is not the same origin');
+    assert.equal((await req('POST', '/api/settings', { Origin: 'http://127.0.0.1:' + (port + 1) }, '{}')).code, 403, 'another local port (another page or app) is refused');
+    assert.equal((await req('POST', '/api/settings', { Origin: 'https://127.0.0.1:' + port }, '{}')).code, 403, 'another scheme');
+    for (const bad of ['null', 'not a url', '', 'file://']) assert.equal((await req('POST', '/api/settings', { Origin: bad }, '{}')).code, 403, 'Origin: ' + JSON.stringify(bad) + ' is refused and does not crash the server');
+    assert.equal((await req('POST', '/api/settings', { 'Sec-Fetch-Site': 'cross-site' }, '{}')).code, 403, 'a browser saying cross-site'); assert.equal((await req('POST', '/api/settings', { 'Sec-Fetch-Site': 'same-origin' }, '{}')).code, 200);
+    assert.equal((await req('POST', '/api/settings', {}, '{}')).code, 200, 'a program on this PC without an Origin');
+    assert.equal((await req('GET', '/api/status', {})).code, 200, 'the server is still alive after all that');
+    assert.equal((await req('POST', '/api/settings', { Origin: self }, '{not json')).code, 400, 'bad JSON is an error, not a crash');
+    for (const p of ['/../public2/secret.txt', '/%2e%2e/public2/secret.txt', '/..%2fpublic2%2fsecret.txt', '/%2e%2e%5cpublic2%5csecret.txt', '/a%00b', '/%']) assert.ok([400, 404].includes((await req('GET', p, {})).code), p);
+    const page = await req('GET', '/', {}); assert.equal(page.code, 200); assert.match(page.headers['content-security-policy'], /script-src 'self'(;|$)/); assert.doesNotMatch(page.headers['content-security-policy'], /script-src[^;]*unsafe/);
+    assert.match(page.headers['content-security-policy'], /frame-ancestors 'none'/); assert.equal(page.headers['x-frame-options'], 'DENY'); assert.equal(page.headers['x-content-type-options'], 'nosniff');
+    assert.ok((await req('GET', '/api/status', {})).headers['content-security-policy'], 'on the API answers too');
+  } finally { await web.close(); }
+});
+
+test('errors shown to people: our own sentences and Discord\'s texts, never internal errors', () => {
+  const { userMessage } = require('../src/discord/client'), api = new (class DiscordAPIError extends Error {})('Missing Permissions');
+  assert.equal(userMessage(new Error('You cannot do that to yourself.')), 'You cannot do that to yourself.'); assert.equal(userMessage(api), 'Missing Permissions');
+  assert.match(userMessage(new TypeError("Cannot read properties of undefined (reading 'secret')")), /Something went wrong/); assert.match(userMessage(new RangeError('x')), /Something went wrong/); assert.match(userMessage(undefined), /Something went wrong/);
+});
+
+test('events from a server other than the chosen one are ignored by every listener; DMs and events without a server still pass', () => {
+  const { onlyOurServer, guildIdOf } = require('../src/discord/client'), got = []; let mine = 'G1'; const handlers = [];
+  const fake = { on(ev, fn) { handlers.push([ev, fn]); return this; } }; onlyOurServer(fake, () => mine);
+  fake.on('x', (a) => got.push(a.tag)); const fire = (a, b) => handlers.forEach(([, fn]) => fn(a, b));
+  fire({ tag: 'message here', guildId: 'G1' }); fire({ tag: 'message elsewhere', guildId: 'G2' }); fire({ tag: 'member here', guild: { id: 'G1' } }); fire({ tag: 'member elsewhere', guild: { id: 'G2' } });
+  fire({ tag: 'reaction elsewhere', message: { guildId: 'G2' } }); fire({ tag: 'old member, new member', guild: { id: 'G2' } }, { guild: { id: 'G2' } }); fire({ tag: 'dm' }); fire({ tag: 'dm channel', guildId: null });
+  assert.deepEqual(got, ['message here', 'member here', 'dm', 'dm channel']); mine = ''; got.length = 0; fire({ tag: 'any', guildId: 'G9' }); assert.deepEqual(got, ['any'], 'with no server chosen yet nothing is filtered');
+  assert.equal(guildIdOf({ message: { guild: { id: 'G3' } } }), 'G3'); assert.equal(guildIdOf(null), '');
+});
+
+test('a saved IMC-Stream password is never sent to a new address: changing the address clears it unless a new one is given with it', () => {
+  const c = createConfig(tmp()); c.set({ bridge: { url: 'http://192.168.1.5:8420' }, bridgePassword: 'hunter22' }); assert.equal(c.secret('bridgePassword'), 'hunter22');
+  c.set({ bridge: { url: 'http://192.168.1.5:8420/' } }); assert.equal(c.secret('bridgePassword'), 'hunter22', 'the same address keeps it');
+  c.set({ bridge: { url: 'http://10.9.9.9:8420' } }); assert.equal(c.secret('bridgePassword'), '', 'a new address clears it'); assert.equal(c.get().bridge.url, 'http://10.9.9.9:8420');
+  c.set({ bridge: { url: 'http://10.1.1.1:8420' }, bridgePassword: 'new-pass-1' }); assert.equal(c.secret('bridgePassword'), 'new-pass-1', 'a new address with its own password keeps that password');
+  c.set({ bridge: { url: 'not an address' } }); assert.equal(c.secret('bridgePassword'), 'new-pass-1', 'a bad address changes nothing');
+});

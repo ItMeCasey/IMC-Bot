@@ -2,6 +2,7 @@
 /**
  * Anti-nuke: if one account deletes channels or roles, or bans people, in a burst (3 within 10 seconds by default), it is probably a
  * hijacked mod account or a rogue bot. The bot then takes away that account's roles that carry power, and tells the mods.
+ *  - Bans and kicks a moderator makes with the bot's own /ban and /kick are counted too (Discord shows the bot as the one who did them).
  *  - Never acts on the server owner or on itself.
  *  - While "Dry run" is on it only says in #mod-log what it would have done.
  *  - Off until switched on. It needs the "View Audit Log" permission (the bot has it) to see who did it.
@@ -11,7 +12,7 @@ const { COLOR, embed } = require('../theme');
 const { POWER } = require('./selfroles');
 
 const KINDS = { channel: AuditLogEvent.ChannelDelete, role: AuditLogEvent.RoleDelete, ban: AuditLogEvent.MemberBanAdd };
-const LABEL = { channel: 'deleted a channel', role: 'deleted a role', ban: 'banned someone' };
+const LABEL = { channel: 'deleted a channel', role: 'deleted a role', ban: 'banned someone', kick: 'kicked someone' };
 const COOLDOWN_MS = 10 * 60000;
 
 module.exports = function createAntiNuke(ctx) {

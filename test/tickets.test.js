@@ -20,7 +20,7 @@ function rig(over) {
 
 test('/ticketpanel posts a message with one button, for people who can manage channels', async () => {
   const r = rig(), sent = [], out = [];
-  await r.cmds.get('ticketpanel').run({ options: { getString: (n) => ({ title: 'Appeals', button: 'Appeal a ban' })[n] || null }, channel: { send: async (m) => sent.push(m) }, reply: async (m) => out.push(m.content) });
+  await r.cmds.get('ticketpanel').run({ memberPermissions: { has: () => true }, options: { getString: (n) => ({ title: 'Appeals', button: 'Appeal a ban' })[n] || null }, channel: { send: async (m) => sent.push(m) }, reply: async (m) => out.push(m.content) });
   assert.equal(sent[0].embeds[0].title, 'Appeals'); assert.equal(sent[0].components[0].components[0].data.custom_id, 'ticket:open'); assert.equal(sent[0].components[0].components[0].data.label, 'Appeal a ban');
   const j = r.cmds.get('ticketpanel').data.toJSON(); assert.equal(j.default_member_permissions, F.ManageChannels.toString()); assert.equal(j.dm_permission, false);
 });
@@ -67,3 +67,13 @@ test('closing still works when there is no #mod-log', async () => {
 });
 
 test('channel names are made safe', () => { assert.equal(createTickets.slug('Sam Smith!!'), 'sam-smith'); assert.equal(createTickets.slug('日本語'), 'user'); assert.equal(createTickets.slug('x'.repeat(50)).length, 20); });
+
+test('pressing the button many times at once makes one channel, and the ticket cap counts the ones still being made', async () => {
+  const r = rig(), orig = r.guild.channels.create; r.guild.channels.create = async (o) => { await new Promise((x) => setImmediate(x)); return orig(o); };
+  const presses = [r.press('ticket:open'), r.press('ticket:open'), r.press('ticket:open')]; await Promise.all(presses.map((p) => r.btns.ticket(p)));
+  assert.equal(r.created.length, 1, 'one channel for three quick presses'); assert.equal(presses.filter((p) => p.out.some((x) => /being made/.test(x))).length, 2);
+  const full = rig(), orig2 = full.guild.channels.create; full.guild.channels.create = async (o) => { await new Promise((x) => setImmediate(x)); return orig2(o); };
+  for (let n = 0; n < 49; n++) full.db.prepare("INSERT INTO tickets (guild_id, channel_id, user_id, created_at) VALUES ('G', ?, ?, 1)").run('c' + n, 'u' + n);
+  const a = full.press('ticket:open', { uid: 'A' }), b = full.press('ticket:open', { uid: 'B' }); await Promise.all([full.btns.ticket(a), full.btns.ticket(b)]);
+  assert.equal(full.created.length, 1, 'only one of two simultaneous tickets fits under the cap of 50'); assert.ok([a, b].some((p) => p.out.some((x) => /too many open tickets/.test(x))));
+});

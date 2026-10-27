@@ -41,3 +41,14 @@ test('the first picture is shown, and partial messages are fetched', async () =>
   await r.sb.onReaction(r.reaction(3, { message: r.msg({ attachments: att }) }), true); assert.deepEqual(r.posts[0].embeds[0].image, { url: 'https://cdn.example/pic.png' });
   const p = rig(), full = p.msg({ id: 'M2' }), part = { partial: true, id: 'M2', fetch: async () => full }; await p.sb.onReaction(p.reaction(3, { message: part }), true); assert.equal(p.posts.length, 1);
 });
+
+test('messages from private or age-restricted channels never reach the board, and two stars at once post once', async () => {
+  const r = rig(), guild = { id: 'G', roles: { everyone: {} } };
+  const priv = r.msg({ guild, channel: { nsfw: false, permissionsFor: () => ({ has: () => false }) } }); assert.equal(await r.sb.onReaction(r.reaction(9, { message: priv }), true), false, 'a channel @everyone cannot see');
+  const nsfw = r.msg({ guild, channel: { nsfw: true, permissionsFor: () => ({ has: () => true }) } }); assert.equal(await r.sb.onReaction(r.reaction(9, { message: nsfw }), true), false, 'age-restricted');
+  const open = r.msg({ guild, channel: { nsfw: false, permissionsFor: () => ({ has: () => true }) } }); assert.equal(await r.sb.onReaction(r.reaction(9, { message: open }), true), true, 'a public channel');
+  assert.equal(r.posts.length, 1);
+  const slow = rig(); const orig = slow.posts.push.bind(slow.posts); slow.posts.push = (...a) => orig(...a);
+  const m = slow.msg({ id: 'RACE' }), reaction = slow.reaction(3, { message: m }); const results = await Promise.all([slow.sb.onReaction(reaction, true), slow.sb.onReaction(reaction, true)]);
+  assert.equal(slow.posts.length, 1, 'posted once'); assert.deepEqual(results.sort(), [false, true]);
+});

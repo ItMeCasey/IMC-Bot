@@ -3,7 +3,7 @@
  * The commands every viewer can use, answered from IMC-Stream (the same lists as the viewers' website):
  * /commands (chat commands, without the mod ones), /games, /tts, /top (points), /live, /website and /schedule.
  */
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { COLOR, embed } = require('../theme');
 
 const cut = (t, n) => (String(t).length > n ? String(t).slice(0, n - 1) + '…' : String(t));
@@ -14,8 +14,9 @@ function answer(name, snap, info) {
   const twitch = snap.login ? 'https://twitch.tv/' + snap.login : '', site = snap.website || '';
   if (name === 'commands') {
     const ex = info.commands || { custom: [], groups: {} }, rows = [];
-    for (const r of ex.custom || []) rows.push('`' + r[0] + '` ' + r[2]);
-    for (const g of Object.keys(ex.groups || {})) if (!/^Mods/.test(g)) for (const r of ex.groups[g]) rows.push('`' + r[0] + '` ' + r[2]);
+    const open = (r) => !r[1] || /^everyone$/i.test(String(r[1]));   // the list also holds commands for subs, VIPs, mods and the streamer: those are not shown here
+    for (const r of ex.custom || []) if (open(r)) rows.push('`' + r[0] + '` ' + r[2]);
+    for (const g of Object.keys(ex.groups || {})) if (!/^Mods/.test(g)) for (const r of ex.groups[g]) if (open(r)) rows.push('`' + r[0] + '` ' + r[2]);
     return { embeds: [embed('Chat commands', cut(rows.join('\n') || 'No commands yet.', 4000) + (site ? '\n\nAll of them: ' + site + '/commands.html' : ''), COLOR.aqua)] };
   }
   if (name === 'games') { const g = info.games || []; return { embeds: [embed('Games', cut(g.map((x) => '**' + x.name + '**: `' + x.how + '`').join('\n') || 'No games are on right now.', 4000) + (site ? '\n\nHow they work: ' + site + '/games.html' : ''), COLOR.heat)] }; }
@@ -36,8 +37,12 @@ function answer(name, snap, info) {
 }
 
 module.exports = function createViewer(ctx) {
+  const cooling = new Map();   // user id -> when they last used a viewer command (one every 5 seconds: each one asks IMC-Stream, which may ask Twitch)
+  const now = ctx.now || Date.now;
   for (const [name, desc] of LIST) {
     ctx.discord.register({ data: new SlashCommandBuilder().setName(name).setDescription(desc).setDMPermission(false), run: async (i) => {
+      if (now() - (cooling.get(i.user.id) || 0) < 5000) return i.reply({ content: 'Slow down a little: try again in a few seconds.', flags: MessageFlags.Ephemeral });
+      cooling.set(i.user.id, now()); if (cooling.size > 500) cooling.delete(cooling.keys().next().value);
       await i.deferReply();
       let snap, info;
       try { [snap, info] = await Promise.all([ctx.bridge.snapshot(), name === 'live' || name === 'website' ? {} : name === 'schedule' ? ctx.bridge.schedule() : ctx.bridge.info()]); } catch (e) {

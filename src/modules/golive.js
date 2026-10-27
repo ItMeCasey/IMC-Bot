@@ -67,7 +67,7 @@ module.exports = function createGoLive(ctx) {
   async function recap(d) {
     const id = ctx.config.get().channels.announcements; if (!id || !d.text) return;
     const ch = await channel(id); if (!ch) return;
-    await ch.send({ embeds: [embed('Stream recap', cut(d.text, 3900), COLOR.aqua)], allowedMentions: { parse: [] } });
+    await ch.send({ embeds: [embed('Stream recap', cut(String(d.text).replace(/(?:https?:\/\/)?(?:www\.)?(?:discord\.gg|discord(?:app)?\.com\/invite|dsc\.gg)\/[a-z0-9-]+/gi, '[invite]'), 3900), COLOR.aqua)], allowedMentions: { parse: [] } });
   }
 
   /** the listener for the bridge */

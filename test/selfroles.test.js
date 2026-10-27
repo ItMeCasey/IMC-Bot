@@ -9,9 +9,9 @@ function rig(rolesById) {
   const cmds = new Map(), btns = {}, sent = [], added = [], removed = [];
   const guild = { id: 'G', members: { me: { roles: { highest: { position: 10 } } } }, roles: { cache: new Map(Object.entries(rolesById)), fetch: async () => null } };
   const sr = createSelfRoles({ log() {}, discord: { register: (c) => cmds.set(c.data.name, c), registerButton: (p, f) => { btns[p] = f; } } });
-  const slash = (opts) => { const out = []; return { out, guild, options: { getRole: (n) => opts[n] || null, getString: (n) => opts[n] || null }, deferReply: async () => {}, editReply: async (m) => out.push(m), channel: { send: async (m) => sent.push(m) } }; };
+  const slash = (opts, who) => { const out = []; return { out, memberPermissions: { has: () => true }, user: { id: (who && who.id) || 'U1' }, member: { roles: { highest: { position: (who && who.pos) || 10 } } }, guild, options: { getRole: (n) => opts[n] || null, getString: (n) => opts[n] || null }, deferReply: async () => {}, editReply: async (m) => out.push(m), channel: { send: async (m) => sent.push(m) } }; };
   const press = (id, has) => { const out = []; return { out, customId: 'role:' + id, guild, member: { roles: { cache: new Map(has ? [[id, {}]] : []), add: async (r, why) => added.push([r, why]), remove: async (r) => removed.push(r) } }, reply: async (m) => out.push(m.content) }; };
-  return { sr, cmds, btns, sent, added, removed, slash, press };
+  return { sr, cmds, btns, sent, added, removed, slash, press, guild };
 }
 
 test('roles with powers, managed roles, @everyone and roles above the bot cannot be offered', () => {
@@ -41,4 +41,13 @@ test('pressing a button gives the role, pressing again removes it, and a role th
   const b = r.press('r1', true); await r.btns.role(b); assert.deepEqual(b.out, ['Removed **Gamer**.']); assert.deepEqual(r.removed, ['r1']);
   roles.r1.permissions = { has: (p) => p === F.ManageMessages }; const c = r.press('r1', false); await r.btns.role(c); assert.match(c.out[0], /has powers/); assert.equal(r.added.length, 1, 'not given');
   const gone = r.press('nope', false); await r.btns.role(gone); assert.match(gone.out[0], /does not exist/);
+});
+
+test('you cannot offer a role above your own top role (the server owner can), and more powers are refused', async () => {
+  const roles = { r1: role('r1', 'Low', { position: 3 }), r2: role('r2', 'Same', { position: 10 }), r3: role('r3', 'Above', { position: 12 }), r4: role('r4', 'Mid', { position: 9 }) }, r = rig(roles);
+  await r.cmds.get('rolepanel').run(r.slash({ title: 'x', role1: roles.r1 })); assert.equal(r.sent.length, 1, 'a role below you is fine');
+  await assert.rejects(r.cmds.get('rolepanel').run(r.slash({ title: 'x', role1: roles.r2 })), /Your own top role is not above Same/); await assert.rejects(r.cmds.get('rolepanel').run(r.slash({ title: 'x', role1: roles.r3 })), /Your own top role is not above Above/);
+  assert.equal(r.sent.length, 1, 'nothing posted for those');
+  const owner = rig(roles); owner.guild.ownerId = 'BOSS'; await owner.cmds.get('rolepanel').run(owner.slash({ title: 'x', role1: roles.r4 }, { id: 'BOSS', pos: 1 })); assert.equal(owner.sent.length, 1, 'the owner may offer a role above their own top role, if the bot can give it');
+  for (const p of ['ManageThreads', 'MuteMembers', 'DeafenMembers', 'MoveMembers', 'ManageGuildExpressions', 'ViewGuildInsights']) assert.match(createSelfRoles.whyNot(role('x', 'X', { permissions: { has: (f) => f === F[p] } }), 10, 'G'), /has powers/, p);
 });

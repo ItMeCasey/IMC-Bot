@@ -6,6 +6,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits: F, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { COLOR, embed } = require('../theme');
 const { parseDuration } = require('./cases');
+const { requirePerm } = require('../perms');
 
 const EPHEMERAL = MessageFlags.Ephemeral, MIN_MS = 30000, MAX_MS = 7 * 86400000, TICK_MS = 15000;
 const unix = (ms) => Math.floor(ms / 1000);
@@ -43,6 +44,7 @@ module.exports = function createPolls(ctx) {
       .addStringOption((o) => o.setName('duration').setDescription('Like 10m, 2h, 1d (30 seconds up to 7 days). Default 1h')))
     .addSubcommand((s) => s.setName('end').setDescription('End a poll now').addIntegerOption((o) => o.setName('id').setDescription('The poll number').setRequired(true).setMinValue(1)));
   ctx.discord.register({ data: b, run: async (i) => {
+    requirePerm(i, F.ManageMessages);
     if (i.options.getSubcommand() === 'end') {
       const p = q.get.get(i.options.getInteger('id', true)); if (!p || p.guild_id !== i.guild.id) throw new Error('No such poll here.');
       if (!(await finish(p))) throw new Error('That poll is already over.'); return i.reply({ content: 'Ended poll #' + p.id + '.', flags: EPHEMERAL });

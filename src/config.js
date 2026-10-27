@@ -20,7 +20,7 @@ const DEFAULTS = { guildId: '', channels: {}, port: 8440, bridge: { url: 'http:/
   announce: { on: false, raids: true, minRaid: 3, milestones: true, milestoneEvery: 100 },
   regulars: { on: false, minDays: 7, minConversations: 10, gapMinutes: 30, restrict: { links: true, attachments: true, invites: true, mentions: true, maxMentions: 2 }, exemptRoles: [], exemptChannels: [], notice: true },
   logging: { on: false, messages: true, members: true, roles: true, voice: false },
-  mirror: { on: false, avatars: true, minRole: 'all', hideCommands: true, commandPrefixes: ['!'], showBadges: true, stripLinks: false, hideBots: ['nightbot', 'streamelements', 'streamlabs', 'moobot', 'fossabot', 'wizebot'], ignore: [] } };
+  mirror: { on: false, avatars: true, minRole: 'all', hideCommands: true, commandPrefixes: ['!'], showBadges: true, stripLinks: true, hideBots: ['nightbot', 'streamelements', 'streamlabs', 'moobot', 'fossabot', 'wizebot'], ignore: [] } };
 // allowed values for the text settings
 const ENUMS = { 'mirror.minRole': ['all', 'subs', 'vip'] };
 // allowed ranges for the numbers in automod ('rule.field': [min, max])
@@ -61,7 +61,7 @@ module.exports = function createConfig(dir, log) {
     b = b || {};
     for (const k of SECRET_KEYS) if (typeof b[k] === 'string') S[k] = b[k].trim();
     if (b.clearToken) S.token = '';
-    if (b.bridge && typeof b.bridge.url === 'string') { try { const u = new URL(b.bridge.url.trim()); if (/^https?:$/.test(u.protocol)) C.bridge = Object.assign({}, C.bridge, { url: u.origin }); } catch (e) { /* not an address: keep the old one */ } }
+    if (b.bridge && typeof b.bridge.url === 'string') { try { const u = new URL(b.bridge.url.trim()); if (/^https?:$/.test(u.protocol)) { if (u.origin !== C.bridge.url && typeof b.bridgePassword !== 'string') S.bridgePassword = ''; C.bridge = Object.assign({}, C.bridge, { url: u.origin }); } /* a saved password is never sent to a new address */ } catch (e) { /* not an address: keep the old one */ } }
     if (b.clearBridgePassword) S.bridgePassword = '';
     if (typeof b.guildId === 'string') C.guildId = /^\d{5,25}$/.test(b.guildId) ? b.guildId : '';
     if (b.dryRun !== undefined) C.dryRun = !!b.dryRun;

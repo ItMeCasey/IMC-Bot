@@ -8,15 +8,17 @@
  */
 const { SlashCommandBuilder, PermissionFlagsBits: F, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { COLOR, embed } = require('../theme');
+const { requirePerm } = require('../perms');
 
-const POWER = ['Administrator', 'ManageGuild', 'ManageRoles', 'ManageChannels', 'ManageMessages', 'ManageWebhooks', 'ManageNicknames', 'KickMembers', 'BanMembers', 'ModerateMembers', 'MentionEveryone', 'ManageEvents', 'ViewAuditLog'];
+const POWER = ['Administrator', 'ManageGuild', 'ManageRoles', 'ManageChannels', 'ManageMessages', 'ManageWebhooks', 'ManageNicknames', 'KickMembers', 'BanMembers', 'ModerateMembers', 'ManageThreads', 'MuteMembers', 'DeafenMembers', 'MoveMembers', 'ManageGuildExpressions', 'ViewGuildInsights', 'MentionEveryone', 'ManageEvents', 'ViewAuditLog'];
 const MAX_ROLES = 10, EPHEMERAL = MessageFlags.Ephemeral;
 
-/** null when the role may be offered, otherwise the reason it may not */
-function whyNot(role, botTop, guildId) {
+/** null when the role may be offered, otherwise the reason it may not. invokerTop (the top role position of the person making the panel) is optional: when given, the role must be below it */
+function whyNot(role, botTop, guildId, invokerTop) {
   if (!role) return 'That role does not exist any more.';
   if (role.id === guildId) return '@everyone cannot be offered.';
   if (role.managed) return role.name + ' belongs to a bot or integration.';
+  if (invokerTop != null && role.position >= invokerTop) return 'Your own top role is not above ' + role.name + ', so you cannot offer it to others.';
   if (role.position >= botTop) return 'My role is not above ' + role.name + '. Move my role up in Server Settings, Roles.';
   const bad = POWER.filter((p) => role.permissions.has(F[p]));
   return bad.length ? role.name + ' has powers (' + bad.slice(0, 3).join(', ') + '), so it cannot be a self-assign role.' : null;
@@ -31,10 +33,12 @@ module.exports = function createSelfRoles(ctx) {
   b.addStringOption((o) => o.setName('text').setDescription('What the buttons are for').setMaxLength(500));
   for (let n = 2; n <= MAX_ROLES; n++) b.addRoleOption((o) => o.setName('role' + n).setDescription('Role ' + n));
   ctx.discord.register({ data: b, run: async (i) => {
+    requirePerm(i, F.ManageRoles);
     await i.deferReply({ flags: EPHEMERAL });
     const g = i.guild, me = g.members.me || await g.members.fetchMe(), top = me.roles.highest.position;
     const roles = [...new Map([...Array(MAX_ROLES).keys()].map((n) => i.options.getRole('role' + (n + 1))).filter(Boolean).map((r) => [r.id, r])).values()];
-    for (const r of roles) { const w = whyNot(r, top, g.id); if (w) throw new Error(w); }
+    const mine = i.user.id === g.ownerId ? null : i.member.roles.highest.position;   // you cannot hand out a role above your own (the owner can)
+    for (const r of roles) { const w = whyNot(r, top, g.id, mine); if (w) throw new Error(w); }
     const rows = [];
     for (let n = 0; n < roles.length; n += 5) rows.push(new ActionRowBuilder().addComponents(roles.slice(n, n + 5).map((r) => new ButtonBuilder().setCustomId('role:' + r.id).setLabel(r.name.slice(0, 80)).setStyle(ButtonStyle.Secondary))));
     await i.channel.send({ embeds: [embed(i.options.getString('title', true), (i.options.getString('text') || 'Press a button to get a role. Press it again to remove it.'), COLOR.aqua)], components: rows, allowedMentions: { parse: [] } });

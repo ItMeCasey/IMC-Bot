@@ -5,6 +5,7 @@
  */
 const { SlashCommandBuilder, PermissionFlagsBits: F, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { COLOR, embed } = require('../theme');
+const { requirePerm } = require('../perms');
 
 const EPHEMERAL = MessageFlags.Ephemeral;
 const STATUS = { open: ['Open', COLOR.heat], approved: ['Approved', COLOR.aqua], denied: ['Denied', COLOR.rust], done: ['Done', COLOR.aqua] };
@@ -35,8 +36,11 @@ module.exports = function createSuggestions(ctx) {
     await ch.messages.edit(s.message_id, { embeds: [card(s)], components: [row(s, off)], allowedMentions: { parse: [] } }).catch((e) => log('suggestion edit failed:', e.message));
   }
 
+  const cooling = new Map();   // user id -> when they last suggested (one every 30 seconds)
   ctx.discord.register({ data: new SlashCommandBuilder().setName('suggest').setDescription('Suggest something for the stream or the server').setDMPermission(false)
     .addStringOption((o) => o.setName('idea').setDescription('Your suggestion').setRequired(true).setMaxLength(1000)), run: async (i) => {
+    if (now() - (cooling.get(i.user.id) || 0) < 30000) throw new Error('Please wait a little before the next suggestion.');
+    cooling.set(i.user.id, now()); if (cooling.size > 500) cooling.delete(cooling.keys().next().value);
     const id = cfg().channels.suggestions, ch = id ? await ctx.fetchChannel(id) : null;
     if (!ch) throw new Error('There is no #suggestions channel yet. A mod needs to press "Set up my server" in the dashboard.');
     const r = q.ins.run(i.guild.id, ch.id, i.user.id, i.options.getString('idea', true).trim(), now()), s = q.get.get(Number(r.lastInsertRowid));
@@ -49,6 +53,7 @@ module.exports = function createSuggestions(ctx) {
   const mod = new SlashCommandBuilder().setName('suggestion').setDescription('Mods: answer a suggestion').setDMPermission(false).setDefaultMemberPermissions(F.ManageMessages);
   sub(mod, 'approve', 'Mark it approved'); sub(mod, 'deny', 'Mark it denied'); sub(mod, 'done', 'Mark it as done');
   ctx.discord.register({ data: mod, run: async (i) => {
+    requirePerm(i, F.ManageMessages);
     const s = q.get.get(i.options.getInteger('id', true)); if (!s || s.guild_id !== i.guild.id) throw new Error('No such suggestion.');
     const status = { approve: 'approved', deny: 'denied', done: 'done' }[i.options.getSubcommand()];
     q.set.run(status, i.options.getString('reason') || null, s.id); const next = q.get.get(s.id); next.author_name = s.user_id;

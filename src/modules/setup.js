@@ -93,4 +93,5 @@ module.exports = function createSetup(ctx) {
   }
   return { plan, apply };
 };
-module.exports.NEEDED = NEEDED; module.exports.diff = diff; module.exports.LAYOUT = LAYOUT; module.exports.ROLES = ROLES;
+// the invite asks for ban as well: /ban, the warn ladder and Undo need it (setup itself does not)
+module.exports.NEEDED = NEEDED; module.exports.INVITE_PERMS = [...NEEDED, 'BanMembers']; module.exports.diff = diff; module.exports.LAYOUT = LAYOUT; module.exports.ROLES = ROLES;

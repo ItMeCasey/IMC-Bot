@@ -77,3 +77,9 @@ test('chatters show their Twitch picture: one request per new person, remembered
   fail = true; say('u4', 'f'); await mir.flush(); assert.equal(sends.at(-1).avatarURL, undefined); assert.equal(sends.at(-1).content, 'f', 'the line still goes out');
   cfg.mirror.avatars = false; asked.length = 0; say('u5', 'g'); await mir.flush(); assert.equal(asked.length, 0, 'switched off: no requests'); assert.equal(sends.at(-1).avatarURL, undefined);
 });
+
+test('Discord invite links in Twitch chat are never passed on, even with the link setting off; links are replaced by default', async () => {
+  const r = rig({ stripLinks: false }); r.chat('join discord.gg/abc123 or https://discord.com/invite/xyz or dsc.gg/q and see https://ok.example.com'); await r.mir.flush();
+  assert.equal(r.sends[0].content, 'join [invite] or [invite] or [invite] and see https://ok.example.com');
+  assert.equal(require('../src/config')(require('node:fs').mkdtempSync(require('node:path').join(require('node:os').tmpdir(), 'imc-m-'))).get().mirror.stripLinks, true, 'replacing links is the default');
+});
