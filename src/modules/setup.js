@@ -11,14 +11,14 @@ const MOD_PERMS = F.KickMembers | F.ManageMessages | F.ModerateMembers | F.ViewA
 // [category, [ [name, type, kind] ]]   kind: 'readonly' = only the bot and mods post, 'private' = mods only
 const LAYOUT = [
   ['INFO', [['welcome', T.GuildText, 'readonly'], ['rules', T.GuildText, 'readonly'], ['announcements', T.GuildText, 'readonly'], ['go-live', T.GuildText, 'readonly']]],
-  ['COMMUNITY', [['general', T.GuildText, ''], ['clips', T.GuildText, ''], ['game-chat', T.GuildText, ''], ['twitch-chat', T.GuildText, 'readonly'], ['bot-commands', T.GuildText, '']]],
+  ['COMMUNITY', [['general', T.GuildText, ''], ['clips', T.GuildText, ''], ['game-chat', T.GuildText, ''], ['twitch-chat', T.GuildText, 'readonly'], ['bot-commands', T.GuildText, ''], ['suggestions', T.GuildText, ''], ['starboard', T.GuildText, 'readonly']]],
   ['VOICE', [['Lounge', T.GuildVoice, ''], ['Gaming 1', T.GuildVoice, ''], ['Gaming 2', T.GuildVoice, '']]],
   ['MODS', [['mod-chat', T.GuildText, 'private'], ['mod-log', T.GuildText, 'private'], ['audit-log', T.GuildText, 'private']]],
 ];
 const ROLES = [['Mods', COLOR.aqua, true, MOD_PERMS], ['Tier 3 Sub', COLOR.rust, true, 0n], ['Tier 2 Sub', COLOR.heat, true, 0n], ['Tier 1 Sub', COLOR.cream, true, 0n]];
-const TOPICS = { welcome: 'Start here', rules: 'The rules of the server', announcements: 'News from the stream', 'go-live': 'Posted by the bot when the stream starts', general: 'Chat about anything', clips: 'Share your best clips', 'game-chat': 'Talk about the games', 'twitch-chat': 'The Twitch chat, mirrored by the bot', 'bot-commands': 'Try the bot here: /ping', 'mod-chat': 'Mods only', 'mod-log': 'Mods only', 'audit-log': 'Mods only: deleted messages, joins and leaves' };
+const TOPICS = { welcome: 'Start here', rules: 'The rules of the server', announcements: 'News from the stream', 'go-live': 'Posted by the bot when the stream starts', general: 'Chat about anything', clips: 'Share your best clips', 'game-chat': 'Talk about the games', 'twitch-chat': 'The Twitch chat, mirrored by the bot', 'bot-commands': 'Try the bot here: /ping', 'suggestions': 'Suggest something with /suggest and vote with the buttons', 'starboard': 'The best messages, picked by reactions', 'mod-chat': 'Mods only', 'mod-log': 'Mods only', 'audit-log': 'Mods only: deleted messages, joins and leaves' };
 // which dashboard setting each channel fills
-const KEYS = { welcome: 'welcome', rules: 'rules', announcements: 'announcements', 'go-live': 'goLive', 'twitch-chat': 'mirror', 'bot-commands': 'botCommands', 'mod-log': 'modLog', 'audit-log': 'auditLog', general: 'general' };
+const KEYS = { welcome: 'welcome', rules: 'rules', announcements: 'announcements', 'go-live': 'goLive', 'twitch-chat': 'mirror', 'bot-commands': 'botCommands', 'mod-log': 'modLog', 'audit-log': 'auditLog', suggestions: 'suggestions', starboard: 'starboard', general: 'general' };
 
 // what the bot needs to build the server (and for the Mods role: a bot can only give permissions it has itself)
 const NEEDED = ['ManageRoles', 'ManageChannels', 'ViewChannel', 'SendMessages', 'EmbedLinks', 'ManageWebhooks', 'KickMembers', 'ManageMessages', 'ModerateMembers', 'ViewAuditLog', 'MuteMembers'];

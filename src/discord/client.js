@@ -24,7 +24,7 @@ module.exports = function createDiscord(ctx) {
     if (!token) { status = { state: 'offline', bot: '', error: 'Paste the bot token first' }; return status; }
     await stop();
     status = { state: 'connecting', bot: '', error: '' };
-    const c = new Client({ intents: [I.Guilds, I.GuildMembers, I.GuildMessages, I.MessageContent, I.GuildVoiceStates], partials: [Partials.Message, Partials.Channel] });
+    const c = new Client({ intents: [I.Guilds, I.GuildMembers, I.GuildMessages, I.MessageContent, I.GuildVoiceStates, I.GuildMessageReactions, I.GuildModeration], partials: [Partials.Message, Partials.Channel, Partials.Reaction] });
     c.on(Events.InteractionCreate, async (i) => {
       if (i.isButton()) {
         const fn = buttons.get(String(i.customId).split(':')[0]);
