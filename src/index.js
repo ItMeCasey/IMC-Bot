@@ -17,6 +17,7 @@ const createLogging = require('./modules/logging');
 const createSelfRoles = require('./modules/selfroles');
 const createViewer = require('./modules/viewer');
 const createGiveaway = require('./modules/giveaway');
+const createTickets = require('./modules/tickets');
 
 const ROOT = path.join(__dirname, '..'), DATA = process.env.IMC_BOT_DATA || path.join(ROOT, 'data');
 const log = (...a) => console.log(new Date().toLocaleTimeString(), ...a);
@@ -49,6 +50,7 @@ async function main() {
   late.selfroles = createSelfRoles(ctx);
   late.viewer = createViewer(ctx);
   late.giveaway = createGiveaway(ctx);
+  late.tickets = createTickets(ctx);
   late.bridge = ctx.bridge = createBridge(ctx);
   late.golive = createGoLive({ ...ctx, channel: async (id) => { const c = ctx.discord.client(); return c ? c.channels.fetch(id).catch(() => null) : null; }, snapshot: () => late.bridge.snapshot() });
   late.bridge.on((ev) => (ev.type.startsWith('chat.') ? late.mirror.onEvent(ev) : late.golive.onEvent(ev)));

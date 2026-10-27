@@ -15,6 +15,9 @@ const STEPS = [
    CREATE INDEX giveaways_open ON giveaways (status, ends_at);
    CREATE TABLE giveaway_entries (giveaway_id INTEGER NOT NULL, user_id TEXT NOT NULL, PRIMARY KEY (giveaway_id, user_id));
    CREATE TABLE giveaway_winners (giveaway_id INTEGER NOT NULL, user_id TEXT NOT NULL, PRIMARY KEY (giveaway_id, user_id));`,
+  `CREATE TABLE tickets (id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id TEXT NOT NULL, channel_id TEXT NOT NULL, user_id TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open',
+     created_at INTEGER NOT NULL, closed_at INTEGER, closed_by TEXT);
+   CREATE INDEX tickets_user ON tickets (guild_id, user_id, status);`,
 ];
 
 module.exports = function openDb(file) {
