@@ -63,7 +63,7 @@ async function waitForBot() { for (let i = 0; i < 120; i++) { try { const r = aw
 function openWindow() {
   if (!win) {
     // the window shows only the local dashboard: no Node in the page, an isolated context, the sandbox on, no remote code, no web views
-    win = new BrowserWindow({ width: 1100, height: 900, minWidth: 700, minHeight: 600, show: false, backgroundColor: '#222A2A', icon: icon('window.png'), autoHideMenuBar: true, title: 'IMC-Bot',
+    win = new BrowserWindow({ width: 1100, height: 900, minWidth: 700, minHeight: 600, show: false, backgroundColor: '#222A2A', icon: icon('window.png'), autoHideMenuBar: true, title: 'IMC-Bot', titleBarStyle: 'hidden', titleBarOverlay: { color: '#1A2020', symbolColor: '#E2DAC2', height: 32 },
       webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, allowRunningInsecureContent: false, webviewTag: false, spellcheck: false } });
     win.once('ready-to-show', () => win.show());
     win.on('close', (e) => { if (!quitting && settings.closeToTray) { e.preventDefault(); win.hide(); } });

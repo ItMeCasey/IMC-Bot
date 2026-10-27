@@ -152,3 +152,14 @@ test('a saved IMC-Stream password is never sent to a new address: changing the a
   c.set({ bridge: { url: 'http://10.1.1.1:8420' }, bridgePassword: 'new-pass-1' }); assert.equal(c.secret('bridgePassword'), 'new-pass-1', 'a new address with its own password keeps that password');
   c.set({ bridge: { url: 'not an address' } }); assert.equal(c.secret('bridgePassword'), 'new-pass-1', 'a bad address changes nothing');
 });
+
+test('the title bar: the page has the Support Us link and the status carries the version', async () => {
+  const dir = tmp(), config = createConfig(dir), discord = { status: () => ({ state: 'offline', bot: '', error: '' }), guilds: () => [], start: async () => {}, stop: async () => {}, registerCommands: async () => {}, guild: async () => ({}) };
+  const web = createWeb({ config, discord, setup: {}, version: '2026.1.2', publicDir: path.join(__dirname, '..', 'public'), log() {} }), port = await web.listen(0);
+  try {
+    assert.equal((await fetch('http://127.0.0.1:' + port + '/api/status').then((r) => r.json())).version, '2026.1.2');
+    const html = await fetch('http://127.0.0.1:' + port + '/').then((r) => r.text());
+    assert.match(html, /<a id="support" href="https:\/\/itmecasey\.com\/support\/" target="_blank" rel="noopener"[^>]*>[^<]*Support Us<\/a>/); assert.match(html, /<header id="top">/);
+    const css = await fetch('http://127.0.0.1:' + port + '/app.css').then((r) => r.text()); assert.match(css, /-webkit-app-region: drag/); assert.match(css, /::-webkit-scrollbar-thumb/); assert.match(css, /titlebar-area-width/);
+  } finally { await web.close(); }
+});

@@ -33,7 +33,7 @@ const log = (...a) => console.log(new Date().toLocaleTimeString(), ...a);
 
 async function main() {
   const config = createConfig(DATA, log), db = openDb(path.join(DATA, 'bot.db'));
-  const ctx = { config, db, log };
+  const ctx = { config, db, log, version: require('../package.json').version };
   ctx.kv = createKv(db);
   const late = {};   // modules that need the Discord connection, which is made just below
   ctx.onReady = (client) => { late.basic.attach(client); late.automod.attach(client); late.streamAlerts.attach(client); late.xp.attach(client); late.starboard.attach(client); late.antinuke.attach(client); late.regulars.attach(client); late.regulars.start(); late.logging.attach(client); late.mirror.start(); late.giveaway.start(); late.polls.start(); late.bridge.start(); late.golive.catchUp().catch((e) => log('go-live catch-up:', e.message)); };   // the bridge starts once Discord is online, so no event is handled before it can be posted

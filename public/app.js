@@ -9,7 +9,7 @@ async function api(path, body) {
 }
 const run = (fn) => async () => { try { await fn(); } catch (e) { toast(e.message, true); } };
 function draw(v) {
-  const b = v.bot, s = v.settings;
+  const b = v.bot, s = v.settings; $('ver').textContent = v.version ? 'v' + v.version : '';
   $('state').textContent = b.state; $('state').className = 'pill ' + (b.state === 'online' ? 'ok' : b.state === 'error' ? 'bad' : '');
   $('botline').innerHTML = b.state === 'online' ? 'Connected as <b class="ok">' + esc(b.bot) + '</b>' : b.error ? '<span class="bad">' + esc(b.error) + '</span>' : s.hasToken ? 'Token saved.' : 'No token yet.';
   $('inviteline').innerHTML = safeUrl(b.invite, 'https://discord.com/oauth2/authorize?') ? 'Bot missing permissions, or not in your server yet? <a href="' + safeUrl(b.invite, 'https://discord.com/oauth2/authorize?') + '" target="_blank" rel="noopener" style="color:var(--aqua)">Open the invite link</a> (adds it with the permissions it needs).' : '';

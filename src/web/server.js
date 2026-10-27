@@ -35,7 +35,7 @@ module.exports = function createWeb(ctx) {
   const send = (res, code, body, type, extra) => { res.writeHead(code, Object.assign({ 'Content-Type': type, 'Cache-Control': 'no-store' }, SECURITY_HEADERS, extra)); res.end(body); };
   const json = (res, code, o) => send(res, code, JSON.stringify(o), 'application/json');
 
-  const status = () => ({ bot: ctx.discord.status(), bridge: ctx.bridge ? ctx.bridge.status() : { state: 'offline', error: '', lastOk: 0 }, settings: ctx.config.view(), guilds: ctx.discord.guilds() });
+  const status = () => ({ version: ctx.version || '', bot: ctx.discord.status(), bridge: ctx.bridge ? ctx.bridge.status() : { state: 'offline', error: '', lastOk: 0 }, settings: ctx.config.view(), guilds: ctx.discord.guilds() });
 
   const routes = {
     'GET status': async () => status(),
