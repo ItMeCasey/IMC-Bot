@@ -41,7 +41,7 @@ To try the bot without streaming, run `node tools/fake-stream.js` (with IMC-Stre
 - The bot stores IDs, counts and the text of moderation reasons. Message text is kept only for a moment in Discord's own cache (for the log); tickets keep a transcript only in `#mod-log`.
 
 ## Develop
-`npm test` runs the tests (Node's built-in test runner, no network, no real Discord). `npm run pack` builds an unpacked app and `npm run dist` the installer into `dist/`. Pushing a tag like `v2026.10.27` (matching `package.json`) builds the installer in GitHub Actions and attaches it to a draft release.
+`npm test` runs the tests (Node's built-in test runner, no network, no real Discord). `npm run pack` builds an unpacked app and `npm run dist` the installer into `dist/`. Versions are `YYYY.M.increment` (year, month, then a number that goes up by one with every release: 2026.10.30, 2026.10.31...). Pushing a tag like `v2026.10.30` (matching `package.json`) builds the installer in GitHub Actions and attaches it to a draft release.
 
 ## Documentation
 - [How it is built](docs/ARCHITECTURE.md): the layout, the modules, the settings, the database, how to add a feature.
