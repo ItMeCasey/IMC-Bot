@@ -19,6 +19,7 @@ const createViewer = require('./modules/viewer');
 const createGiveaway = require('./modules/giveaway');
 const createTickets = require('./modules/tickets');
 const createRegulars = require('./modules/regulars');
+const createAnnounce = require('./modules/announce');
 
 const ROOT = path.join(__dirname, '..'), DATA = process.env.IMC_BOT_DATA || path.join(ROOT, 'data');
 const log = (...a) => console.log(new Date().toLocaleTimeString(), ...a);
@@ -54,9 +55,10 @@ async function main() {
   late.giveaway = createGiveaway(ctx);
   late.tickets = createTickets(ctx);
   late.regulars = createRegulars(ctx);
+  late.announce = createAnnounce(ctx);
   late.bridge = ctx.bridge = createBridge(ctx);
   late.golive = createGoLive({ ...ctx, channel: async (id) => { const c = ctx.discord.client(); return c ? c.channels.fetch(id).catch(() => null) : null; }, snapshot: () => late.bridge.snapshot() });
-  late.bridge.on((ev) => (ev.type.startsWith('chat.') ? late.mirror.onEvent(ev) : late.golive.onEvent(ev)));
+  late.bridge.on((ev) => (ev.type.startsWith('chat.') ? late.mirror.onEvent(ev) : (late.announce.onEvent(ev), late.golive.onEvent(ev))));
   ctx.setup = createSetup(ctx);
   const web = createWeb({ ...ctx, publicDir: path.join(ROOT, 'public') });
   const port = await web.listen(config.get().port);

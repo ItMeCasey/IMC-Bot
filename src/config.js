@@ -12,6 +12,7 @@ const DEFAULTS = { guildId: '', channels: {}, port: 8440, bridge: { url: 'http:/
   automod: { on: false, warn: true, spam: { on: true, count: 5, seconds: 6 }, duplicate: { on: true, count: 3, seconds: 30 }, mentions: { on: true, max: 5 }, invites: { on: true },
     links: { on: false, allow: ['twitch.tv', 'youtube.com', 'youtu.be'] }, caps: { on: true, minLength: 15, percent: 70 }, emoji: { on: true, max: 10 }, words: { on: false, list: [] },
     raid: { on: true, joins: 8, seconds: 30 }, accountAge: { on: false, days: 3 } },
+  announce: { on: false, raids: true, minRaid: 3, milestones: true, milestoneEvery: 100 },
   regulars: { on: false, minDays: 7, minConversations: 10, gapMinutes: 30, restrict: { links: true, attachments: true, invites: true, mentions: true, maxMentions: 2 }, exemptRoles: [], notice: true },
   logging: { on: false, messages: true, members: true, roles: true, voice: false },
   mirror: { on: false, minRole: 'all', hideCommands: true, commandPrefixes: ['!'], showBadges: true, stripLinks: false, hideBots: ['nightbot', 'streamelements', 'streamlabs', 'moobot', 'fossabot', 'wizebot'], ignore: [] } };
@@ -19,7 +20,7 @@ const DEFAULTS = { guildId: '', channels: {}, port: 8440, bridge: { url: 'http:/
 const ENUMS = { 'mirror.minRole': ['all', 'subs', 'vip'] };
 // allowed ranges for the numbers in automod ('rule.field': [min, max])
 const RANGES = { 'spam.count': [2, 30], 'spam.seconds': [2, 60], 'duplicate.count': [2, 20], 'duplicate.seconds': [5, 60], 'mentions.max': [1, 50], 'caps.minLength': [5, 200], 'caps.percent': [30, 100],
-  'emoji.max': [1, 100], 'regulars.minDays': [0, 365], 'regulars.minConversations': [0, 500], 'regulars.gapMinutes': [5, 240], 'regulars.restrict.maxMentions': [0, 20], 'raid.joins': [2, 100], 'raid.seconds': [5, 600], 'accountAge.days': [1, 365] };
+  'emoji.max': [1, 100], 'announce.minRaid': [1, 100000], 'announce.milestoneEvery': [10, 1000000], 'regulars.minDays': [0, 365], 'regulars.minConversations': [0, 500], 'regulars.gapMinutes': [5, 240], 'regulars.restrict.maxMentions': [0, 20], 'raid.joins': [2, 100], 'raid.seconds': [5, 600], 'accountAge.days': [1, 365] };
 /** takes only the settings that exist, with the right kind of value and inside their range; anything else is dropped */
 function cleanAutomod(def, inp, path) {
   const out = {};
@@ -45,6 +46,7 @@ module.exports = function createConfig(dir, log) {
   C.mirror = cleanAutomod(DEFAULTS.mirror, C.mirror, 'mirror');
   C.logging = cleanAutomod(DEFAULTS.logging, C.logging, 'logging');
   C.regulars = cleanAutomod(DEFAULTS.regulars, C.regulars, 'regulars');
+  C.announce = cleanAutomod(DEFAULTS.announce, C.announce, 'announce');
   C.moderation = Object.assign({}, DEFAULTS.moderation, C.moderation, { ladder: Object.assign({}, DEFAULTS.moderation.ladder, (C.moderation || {}).ladder) });   // an older file gets the new settings
 
   /** change settings; secrets go to their own file. Returns the page-safe view */
@@ -63,6 +65,7 @@ module.exports = function createConfig(dir, log) {
       if (m.ladder) M.ladder = { timeoutAt: int(m.ladder.timeoutAt, 0, 50, M.ladder.timeoutAt), timeoutMinutes: int(m.ladder.timeoutMinutes, 1, 40320, M.ladder.timeoutMinutes), banAt: int(m.ladder.banAt, 0, 50, M.ladder.banAt) };
     }
     if (b.automod) C.automod = cleanAutomod(C.automod, b.automod, '');
+    if (b.announce) C.announce = cleanAutomod(C.announce, b.announce, 'announce');
     if (b.regulars) C.regulars = cleanAutomod(C.regulars, b.regulars, 'regulars');
     if (b.logging) C.logging = cleanAutomod(C.logging, b.logging, 'logging');
     if (b.mirror) C.mirror = cleanAutomod(C.mirror, b.mirror, 'mirror');

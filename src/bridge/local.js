@@ -20,6 +20,8 @@ module.exports = function createLocalBridge(ctx) {
   const snapshot = () => get('/api/bridge/state');
   /** the lists the viewer commands answer from: commands, games, points top, text-to-speech help */
   const info = () => get('/api/bridge/info');
+  /** the next streams from the Twitch schedule: { segments: [{ start, end, title, category, canceled }] } */
+  const schedule = () => get('/api/bridge/schedule');
   const on = (fn) => handlers.push(fn);
 
   /** one round: ask for news, hand each event to the listeners. Returns how many were new */
@@ -52,5 +54,5 @@ module.exports = function createLocalBridge(ctx) {
     loop();
   }
   function stop() { running = false; clearTimeout(timer); }
-  return { start, stop, poll, on, snapshot, info, sleep, status: () => status };
+  return { start, stop, poll, on, snapshot, info, schedule, sleep, status: () => status };
 };

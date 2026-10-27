@@ -18,12 +18,19 @@ test('each answer uses the stream app\'s lists and leaves out the mod commands',
   assert.equal(a('website', LIVE, {}).content, 'https://site.example'); assert.match(a('website', {}, {}).content, /not published/);
 });
 
-test('the six commands are registered, public, and say so plainly when the stream app is not reachable', async () => {
+test('the seven commands are registered, public, and say so plainly when the stream app is not reachable', async () => {
   const cmds = new Map(); let down = false;
   createViewer({ discord: { register: (c) => cmds.set(c.data.name, c) }, bridge: { snapshot: async () => { if (down) throw new Error('x'); return LIVE; }, info: async () => INFO } });
-  assert.deepEqual([...cmds.keys()], ['commands', 'games', 'tts', 'top', 'live', 'website']);
+  assert.deepEqual([...cmds.keys()], ['commands', 'games', 'tts', 'top', 'live', 'website', 'schedule']);
   assert.equal(cmds.get('top').data.toJSON().default_member_permissions, undefined, 'everybody can use them');
   const run = async (n) => { const out = []; await cmds.get(n).run({ deferReply: async () => {}, editReply: async (m) => out.push(m) }); return out[0]; };
   const ok = await run('top'); assert.match(ok.embeds[0].description, /Sam/); assert.deepEqual(ok.allowedMentions, { parse: [] });
   down = true; assert.match((await run('top')).content, /cannot reach the stream app/); assert.match((await run('live')).content, /cannot reach/);
+});
+
+test('/schedule lists the next streams with Discord times, strikes out canceled ones, and says so when there are none', () => {
+  const a = createViewer.answer, t = Date.UTC(2026, 9, 30, 20, 0, 0), sec = t / 1000;
+  const d = a('schedule', LIVE, { segments: [{ start: new Date(t).toISOString(), title: 'Tetris night', category: 'Tetris', canceled: false }, { start: new Date(t + 86400000).toISOString(), title: 'Chill', category: '', canceled: true }] }).embeds[0].description;
+  assert.equal(d, '<t:' + sec + ':F> (<t:' + sec + ':R>) **Tetris night** (Tetris)\n~~<t:' + (sec + 86400) + ':F> (<t:' + (sec + 86400) + ':R>) **Chill**~~ canceled');
+  assert.equal(a('schedule', LIVE, { segments: [] }).embeds[0].description, 'No streams are scheduled right now.\nhttps://twitch.tv/itmecasey');
 });
