@@ -1,3 +1,8 @@
+> **Status (2026-10-27).** This is the original design plan, kept for the reasons behind the choices. What was built is in the README.
+> Built as planned: the dashboard, setup, moderation and cases, AutoMod, the chat mirror, go-live and recaps, the server log, self-roles, tickets, giveaways, XP and more.
+> Changed: the dashboard port is 8440; the database is Node's built-in SQLite; the bridge is local only and asks without a shared secret.
+> **Dropped:** Twitch-Discord account linking, ban sync, sub and follower role sync, Discord-to-Twitch chat, and the relay mode (sections 3 relay, 4, 5 and the role-sync part of 6).
+
 # IMC-Bot: build plan
 
 A Discord bot that moderates and runs a streamer's Discord server, and works hand in hand with IMC-Stream: shared bans, chat mirror, go-live posts, sub roles.
