@@ -10,6 +10,11 @@ const STEPS = [
    CREATE INDEX cases_target ON cases (guild_id, target_discord_id);
    CREATE TABLE warnings (case_id INTEGER PRIMARY KEY, decays_at INTEGER);
    CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT);`,
+  `CREATE TABLE giveaways (id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id TEXT NOT NULL, channel_id TEXT NOT NULL, message_id TEXT, prize TEXT NOT NULL, host TEXT NOT NULL,
+     winners INTEGER NOT NULL DEFAULT 1, required_role TEXT, ends_at INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'open', created_at INTEGER NOT NULL);
+   CREATE INDEX giveaways_open ON giveaways (status, ends_at);
+   CREATE TABLE giveaway_entries (giveaway_id INTEGER NOT NULL, user_id TEXT NOT NULL, PRIMARY KEY (giveaway_id, user_id));
+   CREATE TABLE giveaway_winners (giveaway_id INTEGER NOT NULL, user_id TEXT NOT NULL, PRIMARY KEY (giveaway_id, user_id));`,
 ];
 
 module.exports = function openDb(file) {

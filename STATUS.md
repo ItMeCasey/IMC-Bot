@@ -1,6 +1,6 @@
 # IMC-Bot status (written overnight, 2026-10-26)
 
-Nothing is committed or pushed, in either project. Run the tests with `npm test` (50 pass).
+Nothing is committed or pushed, in either project. Run the tests with `npm test` (57 pass).
 
 ## What exists now
 | Area | What it does | Default |
@@ -13,6 +13,7 @@ Nothing is committed or pushed, in either project. Run the tests with `npm test`
 | Server log | Deleted/edited messages, joins/leaves, nicknames, roles, voice into `#audit-log` | **off** |
 | Self-assign roles | `/rolepanel` posts buttons that toggle roles (refuses roles with powers) | on (mods with Manage Roles) |
 | Viewer commands | `/commands /games /tts /top /live /website`, answered from IMC-Stream (they were lost when the built-in bot was removed, now back) | on, needs the bridge |
+| Giveaways | `/giveaway start prize duration [winners] [role]`, `end`, `cancel`, `reroll`, `list`; Enter button; random draw; survives restarts | on (mods with Manage Messages) |
 | Go-live + recap | One message per stream, edited as it changes and ends; recaps to `#announcements` | on, needs the bridge |
 
 Dry run (dashboard, Switches) is still **on**: AutoMod and the warn ladder only report in `#mod-log`, they change nothing.
