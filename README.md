@@ -31,9 +31,6 @@ The bot reads from IMC-Stream over a small bridge on your own PC (`http://127.0.
 
 To try the bot without streaming, run `node tools/fake-stream.js` (with IMC-Stream closed) and open http://localhost:8420: buttons start and end a stream, change the title, send chat lines, raids and follows, and make a recap.
 
-## Not included
-Linking Twitch and Discord accounts (and, with it, syncing bans and sub roles between them) is not built. Sending Discord chat into Twitch is not built either.
-
 ## Permissions and privacy
 - The invite link asks only for the permissions the bot uses (manage roles and channels, kick, manage messages, moderate members, view the audit log, manage webhooks, embed links).
 - The bot needs the **Server Members** and **Message Content** intents.
@@ -41,4 +38,4 @@ Linking Twitch and Discord accounts (and, with it, syncing bans and sub roles be
 - The bot stores IDs, counts and the text of moderation reasons. Message text is kept only for a moment in Discord's own cache (for the log); tickets keep a transcript only in `#mod-log`.
 
 ## Develop
-`npm test` runs the tests (Node's built-in test runner, no network, no real Discord). `npm run pack` builds an unpacked app and `npm run dist` the installer into `dist/`. Pushing a tag like `v2026.10.27` (matching `package.json`) builds the installer in GitHub Actions and attaches it to a draft release. Design notes and the original plan are in `docs/DESIGN.md`.
+`npm test` runs the tests (Node's built-in test runner, no network, no real Discord). `npm run pack` builds an unpacked app and `npm run dist` the installer into `dist/`. Pushing a tag like `v2026.10.27` (matching `package.json`) builds the installer in GitHub Actions and attaches it to a draft release.
