@@ -18,7 +18,7 @@
     "dist": "electron-builder --win nsis --publish never"
   },
   "dependencies": {
-    "discord.js": "^14.16.0"
+    "discord.js": "^14.28.1"
   },
   "devDependencies": {
     "electron": "^45.0.0",
